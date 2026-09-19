@@ -1,0 +1,3721 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer">
+<title>DXF 三维数模工具 · DXF → 3D Model (STL)</title>
+<style>
+:root{
+  --bg:#f4f6f8; --panel:#ffffff; --panel2:#fafbfc; --sunken:#f0f2f5;
+  --line:#e2e6ea; --line2:#edf0f3;
+  --txt:#1b1f24; --txt2:#5a646e; --txt3:#8b939c;
+  --accent:#2f6fed; --accent-weak:#eaf1ff; --accent-line:#bcd2fb;
+  --ok:#128a4a; --ok-weak:#e6f6ed;
+  --warn:#9a6b00; --warn-weak:#fff5da; --warn-line:#f0dca4;
+  --err:#b6342a; --err-weak:#fdeceb;
+  --radius:10px; --radius-s:7px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#15181c; --panel:#1c2025; --panel2:#191d21; --sunken:#12151a;
+    --line:#2b3138; --line2:#23282e;
+    --txt:#e7eaee; --txt2:#a2abb5; --txt3:#7b848e;
+    --accent:#5c95ff; --accent-weak:#1b2634; --accent-line:#2f4company;
+    --accent-line:#2f4a72;
+    --ok:#3ec27e; --ok-weak:#12251b;
+    --warn:#e0b054; --warn-weak:#2a2214; --warn-line:#4a3d22;
+    --err:#ef6b60; --err-weak:#2b1917;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;font:13px/1.5 var(--sans);background:var(--bg);color:var(--txt);
+  height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-s);padding:5px 11px;transition:.12s}
+button:hover{border-color:var(--accent-line)}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.06)}
+button.ghost{background:transparent;border-color:transparent;color:var(--txt2)}
+button.ghost:hover{background:var(--sunken);border-color:var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+input[type=text],input[type=number],select{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-s);padding:4px 7px;width:100%;
+}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+a{color:var(--accent)}
+code{font-family:var(--mono);font-size:11.5px;background:var(--sunken);padding:1px 4px;border-radius:4px}
+
+/* ---------- header ---------- */
+header{
+  display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--panel);
+  border-bottom:1px solid var(--line);flex:0 0 auto;
+}
+.brand{display:flex;align-items:baseline;gap:9px;min-width:0}
+.brand h1{font-size:14.5px;margin:0;font-weight:650;letter-spacing:.1px;white-space:nowrap}
+.brand .sub{font-size:11.5px;color:var(--txt3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spacer{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:var(--radius-s);overflow:hidden;background:var(--panel)}
+.seg button{border:0;border-radius:0;padding:5px 12px;color:var(--txt2);background:transparent}
+.seg button[aria-pressed=true]{background:var(--accent-weak);color:var(--accent);font-weight:600}
+.seg button+button{border-left:1px solid var(--line)}
+
+/* ---------- banner ---------- */
+.banners{flex:0 0 auto;display:flex;flex-direction:column}
+.banner{display:flex;gap:8px;align-items:flex-start;padding:6px 14px;font-size:12px;border-bottom:1px solid var(--line)}
+.banner[hidden]{display:none}
+.banner.warn{background:var(--warn-weak);color:var(--warn)}
+.banner.err{background:var(--err-weak);color:var(--err)}
+.banner.info{background:var(--accent-weak);color:var(--accent)}
+.banner .bi{font-weight:700;flex:0 0 auto}
+
+/* ---------- main ---------- */
+main{flex:1;display:grid;grid-template-columns:250px minmax(0,1fr) 296px;min-height:0;background:var(--bg)}
+@media (max-width:1080px){ main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(240px,1fr) auto} }
+.col{min-height:0;display:flex;flex-direction:column;background:var(--panel)}
+.col.left{border-right:1px solid var(--line)}
+.col.right{border-left:1px solid var(--line);overflow:auto}
+.col.mid{background:var(--sunken);min-width:0}
+.phead{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);
+  font-size:11.5px;font-weight:650;color:var(--txt2);text-transform:uppercase;letter-spacing:.6px;flex:0 0 auto;
+}
+.phead .spacer{flex:1}
+
+/* ---------- queue ---------- */
+.drop{margin:10px;padding:18px 10px;border:1.5px dashed var(--line);border-radius:var(--radius);text-align:center;color:var(--txt3);font-size:12px;transition:.12s}
+.drop.hot{border-color:var(--accent);background:var(--accent-weak);color:var(--accent)}
+.drop b{display:block;color:var(--txt);font-size:12.5px;margin-bottom:3px}
+.list{flex:1;overflow:auto;padding:0 8px 8px}
+.item{display:flex;gap:6px;align-items:center;padding:6px 6px 6px 8px;border-radius:var(--radius-s);border:1px solid transparent;cursor:pointer;font-size:12px}
+.item:hover{background:var(--panel2)}
+.item[aria-current=true]{background:var(--accent-weak);border-color:var(--accent-line)}
+.item .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .sz{color:var(--txt3);font-size:11px;font-variant-numeric:tabular-nums}
+.item .del{
+  flex:0 0 auto;width:20px;height:20px;padding:0;line-height:1;font-size:15px;border:0;
+  border-radius:5px;background:transparent;color:var(--txt3);opacity:.55;transition:.12s;
+}
+.item:hover .del{opacity:1}
+.item .del:hover{background:var(--err-weak);color:var(--err);opacity:1}
+.item .del:focus-visible{opacity:1}
+.dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;background:var(--txt3)}
+.dot.done{background:var(--ok)} .dot.err{background:var(--err)} .dot.work{background:var(--accent);animation:pulse 1s infinite}
+.dot.stale{background:var(--warn)}
+@keyframes pulse{50%{opacity:.25}}
+.emptyhint{padding:14px 12px;color:var(--txt3);font-size:11.5px;line-height:1.7}
+
+/* ---------- stage ---------- */
+.stage-top{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex:0 0 auto}
+#stageWrap{position:relative;flex:1;min-height:0;overflow:hidden;background:
+  linear-gradient(45deg,rgba(128,128,128,.045) 25%,transparent 25%,transparent 75%,rgba(128,128,128,.045) 75%),
+  linear-gradient(45deg,rgba(128,128,128,.045) 25%,transparent 25%,transparent 75%,rgba(128,128,128,.045) 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px}
+#stage{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#stage.drag{cursor:grabbing}
+/* 三维预览画布：与二维画布同一容器互斥切换。canvas 必须显式声明
+   [hidden]{display:none}，否则 display:block 会盖掉 hidden 属性。 */
+#stage3d{width:100%;height:100%;display:block;touch-action:none;cursor:grab;position:absolute;inset:0}
+#stage3d.drag{cursor:grabbing}
+#stage3d[hidden],#stage[hidden],#axis3d[hidden]{display:none}
+.axis{position:absolute;right:10px;bottom:10px;width:58px;height:58px;pointer-events:none;opacity:.85}
+.ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--txt3);font-size:12.5px;text-align:center;pointer-events:none;padding:20px}
+.ph svg{opacity:.35}
+.chip{position:absolute;left:10px;bottom:10px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font:11px var(--mono);color:var(--txt2);box-shadow:var(--shadow)}
+#busy{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(127,127,127,.18);backdrop-filter:blur(1px);font-weight:600;color:var(--txt);gap:8px}
+#busy[hidden]{display:none}
+.spin{width:15px;height:15px;border:2px solid var(--accent);border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ---------- params ---------- */
+.pgroup{padding:10px 12px;border-bottom:1px solid var(--line2)}
+.pgroup:last-child{border-bottom:0}
+.pgroup>h3{margin:0 0 8px;font-size:11px;font-weight:650;color:var(--txt3);text-transform:uppercase;letter-spacing:.6px}
+.field{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.field:last-child{margin-bottom:0}
+.field>label{flex:1;font-size:12px;color:var(--txt2);min-width:0}
+.field>label .v{color:var(--txt);font-family:var(--mono);font-size:11.5px}
+.field>label .hint{display:block;font-size:10.5px;color:var(--txt3);line-height:1.45;margin-top:1px}
+.field>.ctl{flex:0 0 auto;width:104px}
+.field.stack{display:block}
+.field.stack .ctl{width:100%;margin-top:4px}
+.tiers{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.tiers button{font-size:11.5px;padding:6px 4px;display:flex;flex-direction:column;gap:1px;align-items:center;line-height:1.35}
+.tiers button small{font-size:10px;color:var(--txt3);font-family:var(--mono)}
+.tiers button[aria-pressed=true]{background:var(--accent-weak);border-color:var(--accent);color:var(--accent);font-weight:600}
+.tiers button[aria-pressed=true] small{color:var(--accent)}
+/* 轮廓角色列表：每行 = 序号 / 深度 / 角色 + 下拉 + 定位 */
+.ringlist{display:flex;flex-direction:column;gap:5px;max-height:190px;overflow:auto}
+.ringrow{display:flex;align-items:center;gap:6px;padding:4px 6px;border:1px solid var(--line);border-radius:var(--radius-s);background:var(--panel2);cursor:pointer}
+.ringrow.sel{border-color:#d85a30;background:var(--warn-weak)}
+.ringrow .ri{flex:1;min-width:0;font-size:11.5px;color:var(--txt2);line-height:1.45}
+.ringrow .ri b{color:var(--txt);font-family:var(--mono)}
+.ringrow .rg{color:var(--txt3);font-size:10.5px}
+.ringrow select{width:78px;font-size:11px}
+
+/* ---------- bottom bars ---------- */
+.bars{flex:0 0 auto;background:var(--panel);border-top:1px solid var(--line)}
+.bar{display:flex;flex-wrap:wrap;gap:0 18px;padding:7px 14px;font-size:12px;align-items:center}
+.bar+.bar{border-top:1px solid var(--line2)}
+.bar .k{color:var(--txt3);font-size:11px;margin-right:5px}
+.bar .val{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:600}
+.bar .val.big{font-size:13.5px;color:var(--accent)}
+.sep{color:var(--line);margin:0 2px}
+.bar .ok{color:var(--ok)} .bar .warn{color:var(--warn)} .bar .err{color:var(--err)} .bar .muted{color:var(--txt3)}
+#actions{display:flex;gap:8px;align-items:center;padding:9px 14px;border-top:1px solid var(--line);flex:0 0 auto;background:var(--panel)}
+/* 诊断条与诊断详情只在专业模式出现：.bar / .diagdetail 自带 display，
+   必须显式声明 [hidden]{display:none}，否则类选择器会盖掉 hidden 特性。 */
+#diagBar[hidden],#diagDetail[hidden]{display:none}
+/* 导出文件名：输入框 + 实时结果预览 */
+.expname{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt2);flex:0 0 auto}
+.expname input{width:186px;font-size:12px;padding:4px 7px}
+.expname input.bad{border-color:var(--warn-line);background:var(--warn-weak)}
+#expNameTip{font-size:11px;color:var(--txt3);max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diagdetail{display:none;padding:0 14px 10px;font-size:11.5px;color:var(--txt2)}
+.diagdetail.open{display:block}
+.diagdetail ul{margin:6px 0 0;padding-left:18px}
+.diagdetail li{margin:2px 0;font-family:var(--mono);font-size:11px}
+
+/* ---------- modal ---------- */
+.modal{position:fixed;inset:0;background:rgba(20,24,28,.45);display:none;align-items:center;justify-content:center;padding:24px;z-index:60}
+.modal.open{display:flex}
+.sheet{background:var(--panel);border-radius:14px;max-width:760px;width:100%;max-height:84dvh;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+.sheet header{border-bottom:1px solid var(--line);border-radius:14px 14px 0 0}
+.sheet .body{overflow:auto;padding:16px 20px;font-size:13px;line-height:1.75}
+.sheet .body h3{font-size:13.5px;margin:18px 0 6px}
+.sheet .body h3:first-child{margin-top:0}
+.sheet .body ol,.sheet .body ul{margin:6px 0;padding-left:20px}
+.sheet .body li{margin:3px 0}
+.sheet .body table{border-collapse:collapse;width:100%;font-size:12px;margin:6px 0}
+.sheet .body th,.sheet .body td{border:1px solid var(--line);padding:4px 8px;text-align:left}
+.sheet .body th{background:var(--panel2);font-weight:600}
+.note{background:var(--ok-weak);border:1px solid var(--line);border-left:3px solid var(--ok);padding:9px 12px;border-radius:var(--radius-s);font-size:12.5px;margin:10px 0}
+footer.ver{padding:10px 20px;border-top:1px solid var(--line);font-size:11px;color:var(--txt3);font-family:var(--mono);word-break:break-all}
+
+/* ---------- toast ---------- */
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:26px;display:flex;flex-direction:column;gap:6px;z-index:80;align-items:center;pointer-events:none}
+.toast{background:var(--txt);color:var(--bg);padding:7px 14px;border-radius:999px;font-size:12px;box-shadow:var(--shadow);animation:tin .18s ease-out}
+@keyframes tin{from{opacity:0;transform:translateY(6px)}}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1 data-i18n="app.title">DXF 线段链化 → SVG</h1>
+    <span class="sub" data-i18n="app.sub">本地计算 · 不上传</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="seg" role="group" aria-label="mode">
+    <button id="mSimple" data-ui="mode" data-val="simple" data-i18n="mode.simple" aria-pressed="true">简易</button>
+    <button id="mPro" data-ui="mode" data-val="pro" data-i18n="mode.pro" aria-pressed="false">专业</button>
+  </div>
+  <div class="seg" role="group" aria-label="language">
+    <button data-ui="lang" data-val="zh" data-i18n="lang.zh" aria-pressed="true">中文</button>
+    <button data-ui="lang" data-val="en" data-i18n="lang.en" aria-pressed="false">EN</button>
+  </div>
+  <button class="ghost" id="btnHelp" data-i18n="btn.help">帮助</button>
+</header>
+
+<div class="banners">
+  <div class="banner info" id="bnBrowser" hidden><span class="bi">i</span><span data-i18n="warn.browser"></span></div>
+  <div class="banner err" id="bnError" hidden><span class="bi">×</span><span id="bnErrorText"></span></div>
+  <div class="banner warn" id="bnUnsupported" hidden><span class="bi">!</span><span id="bnUnsupportedText"></span></div>
+  <div class="banner warn" id="bnModel" hidden><span class="bi">!</span><span id="bnModelText"></span></div>
+</div>
+
+<main>
+  <section class="col left">
+    <div class="phead"><span data-i18n="queue.title">文件队列</span><span class="spacer"></span><button class="ghost" id="btnClear" style="padding:1px 7px;font-size:11px" data-i18n="btn.clear">清空</button></div>
+    <div class="drop" id="drop">
+      <b data-i18n="queue.drop">拖入 DXF 文件或文件夹</b>
+      <span data-i18n="queue.dropSub">或点击选择文件</span>
+    </div>
+    <div class="list" id="list"></div>
+    <div class="emptyhint" id="queueHint" data-i18n="queue.hint"></div>
+  </section>
+
+  <section class="col mid">
+    <div class="stage-top">
+      <div class="seg" role="group">
+        <button data-ui="view" data-val="model" data-i18n="stage.view.model" aria-pressed="true">三维数模</button>
+        <button data-ui="view" data-val="contour" data-i18n="stage.view.contour" aria-pressed="false">轮廓</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="ghost" id="btnZoomOut" title="-">−</button>
+      <button class="ghost" id="btnZoomIn" title="+">+</button>
+      <button class="ghost" id="btnFit" data-i18n="btn.fit">适应窗口</button>
+      <button class="ghost" id="btnSpin" data-i18n="btn.spin">自动旋转</button>
+    </div>
+    <div id="stageWrap">
+      <canvas id="stage3d"></canvas>
+      <svg id="stage" hidden xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+      <svg class="axis" id="axis3d" hidden viewBox="-32 -32 64 64" aria-hidden="true"></svg>
+      <div class="ph" id="placeholder">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M12 12l9-5M12 12v10M12 12L3 7"/></svg>
+        <div data-i18n="stage.placeholder">拖入 DXF 后自动链化并生成三维数模</div>
+      </div>
+      <div class="chip" id="chip" hidden></div>
+      <div id="busy" hidden><span class="spin"></span><span data-i18n="msg.processing">处理中…</span></div>
+    </div>
+  </section>
+
+  <section class="col right">
+    <div class="phead"><span data-i18n="params.title">参数</span><span class="spacer"></span><span id="pMode" style="font-size:10px;font-weight:400"></span></div>
+    <div id="params"></div>
+  </section>
+</main>
+
+<div class="bars">
+  <div class="bar" id="statBar"></div>
+  <div class="bar" id="diagBar"></div>
+  <div class="diagdetail" id="diagDetail"></div>
+</div>
+
+<div id="actions">
+  <button class="primary" id="btnConvert" data-i18n="btn.convertAll">转换全部</button>
+  <button id="btnExport" data-i18n="btn.export">导出</button>
+  <span class="sep">|</span>
+  <label class="expname" for="expName" data-i18n-title="exp.nameHint">
+    <span data-i18n="exp.name">文件名</span>
+    <input type="text" id="expName" maxlength="120" spellcheck="false" autocomplete="off" data-i18n-ph="exp.namePh">
+  </label>
+  <span id="expNameTip"></span>
+  <span class="sep">|</span>
+  <label class="exq" style="display:flex;gap:5px;align-items:center;font-size:12px;color:var(--txt)">
+    <input type="checkbox" id="optStl"> <b data-i18n="exp.stl">三维数模 STL</b>
+  </label>
+  <label style="display:flex;gap:5px;align-items:center;font-size:12px;color:var(--txt2)">
+    <input type="checkbox" id="optSvg"> <span data-i18n="exp.svg">SVG（附带）</span>
+  </label>
+  <label style="display:flex;gap:5px;align-items:center;font-size:12px;color:var(--txt2)">
+    <input type="checkbox" id="optPng"> <span data-i18n="exp.png">PNG 预览</span>
+  </label>
+  <div class="spacer"></div>
+  <span id="expMode" style="font-size:11px;color:var(--txt3)"></span>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true">
+  <div class="sheet">
+    <header>
+      <div class="brand"><h1 id="mTitle"></h1></div>
+      <div class="spacer"></div>
+      <button class="ghost" id="btnModalClose" data-i18n="btn.close">关闭</button>
+    </header>
+    <div class="body" id="mBody"></div>
+    <footer class="ver" id="mVer"></footer>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".dxf,.DXF" multiple class="sr">
+<div id="toast" aria-live="polite"></div>
+
+<script>
+/*==CORE_BEGIN==*/
+/* ============================================================================
+ *  CORE —— 纯函数区（无 DOM 依赖）
+ *  该区块可被外部测试脚本整段抽取，用于离线回归验证。
+ * ==========================================================================*/
+
+/* ---------- 常量与数值工具 ---------- */
+var DEG = Math.PI / 180;
+
+function fmt(v, dp) {
+  if (!isFinite(v)) return '0';
+  var s = v.toFixed(dp === undefined ? 6 : dp);
+  if (s.indexOf('.') >= 0) { s = s.replace(/0+$/, '').replace(/\.$/, ''); }
+  if (s === '-0') s = '0';
+  return s;
+}
+function dist(a, b) { var dx = b[0] - a[0], dy = b[1] - a[1]; return Math.sqrt(dx * dx + dy * dy); }
+
+/* ---------- 导出文件名（纯逻辑，可离线回归） ----------
+ * 为什么要清理：文件名直接进 FS Access API 与 ZIP 中央目录，
+ * 含路径分隔符会写到别的目录、含控制字符会让 ZIP 头与某些解压器出错。
+ * 规则取 Windows 与 macOS 的交集（最保守）：\ / : * ? " < > | 与控制字符一律去掉，
+ * 首部点（会变成隐藏文件）与尾部点空格（Windows 不允许）也去掉。
+ * 中文、空格、括号、连字符、下划线全部保留 —— 客户图纸名里最常见的就是这些。
+ */
+function sanitizeFileName(s) {
+  if (s === undefined || s === null) return '';
+  var out = String(s)
+    .replace(/[\\\/:*?"<>|]/g, '')
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\.+/, '')
+    .replace(/[. ]+$/, '');
+  return out.slice(0, 120);
+}
+function padIndex(n, total) {
+  var w = String(Math.max(1, total || 1)).length, s = String(n);
+  while (s.length < w) s = '0' + s;
+  return s;
+}
+/* 计算单个输出文件的基础名（不含扩展名）：
+ *   pattern 为空            → 沿用原文件名（去掉 .dxf）
+ *   pattern 含 {name}       → 替换为原文件名
+ *   pattern 含 {n}          → 替换为序号（按总数量补前导零）
+ *   多文件且无任何占位符     → 自动补 _序号，避免同名互相覆盖
+ */
+function outputBaseName(pattern, origName, idx, total) {
+  var orig = sanitizeFileName(origName) || 'drawing';
+  var raw = sanitizeFileName(pattern);
+  if (!raw) return orig;
+  var n = (idx || 0) + 1, T = Math.max(1, total || 1);
+  var hasTok = raw.indexOf('{name}') >= 0 || raw.indexOf('{n}') >= 0;
+  var s = raw.split('{name}').join(orig).split('{n}').join(padIndex(n, T));
+  s = sanitizeFileName(s);
+  if (T > 1 && !hasTok) s = sanitizeFileName(s + '_' + padIndex(n, T));
+  return s || orig;
+}
+
+/* ---------- DXF 组码解析 ----------
+ * 结构：每两行一组（组码行 + 值行），组码行可能右对齐带空格，值行同样可能右对齐。
+ * 因此两侧统一 trim；数值一律 parseFloat。
+ */
+function parseDxf(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  var raw = text.split(/\r\n|\n|\r/);
+  var code = [], val = [], i = 0, L = raw.length;
+  while (i < L) {
+    var cs = raw[i];
+    if (!/^\s*-?\d+\s*$/.test(cs)) { i++; continue; }   // 失步自恢复
+    code.push(parseInt(cs, 10));
+    val.push(i + 1 < L ? raw[i + 1] : '');
+    i += 2;
+  }
+  var n = code.length;
+  var out = {
+    header: {}, layers: {}, blocks: {}, entities: [],
+    acadVer: '', codepage: '', insUnits: 0, measurement: 0,
+    extMinHeader: null, extMaxHeader: null, sections: []
+  };
+
+  function num(d, c, k) { var a = d[c]; return a && a.length > (k || 0) ? parseFloat(a[k || 0]) : NaN; }
+  function str(d, c, k) { var a = d[c]; return a && a.length > (k || 0) ? String(a[k || 0]).trim() : ''; }
+
+  /* 读取一条记录：起始位是 组码0/类型名，直到下一个组码 0 为止 */
+  function readRec(p) {
+    var type = String(val[p]).trim(), d = {}, k;
+    p++;
+    while (p < n && code[p] !== 0) {
+      k = code[p];
+      if (!d[k]) d[k] = [];
+      d[k].push(val[p]);
+      p++;
+    }
+    return { type: type, d: d, next: p };
+  }
+
+  var p = 0;
+  while (p < n) {
+    if (code[p] !== 0 || String(val[p]).trim() !== 'SECTION') { p++; continue; }
+    /* 组码对序列：(0,'SECTION') 紧跟 (2,'名称')；读完后 p 指向该段第一个内容项 */
+    var name = (code[p + 1] === 2) ? String(val[p + 1]).trim() : '';
+    out.sections.push(name);
+    p += 2;
+
+    if (name === 'HEADER') {
+      var cur = null;
+      while (p < n && !(code[p] === 0 && String(val[p]).trim() === 'ENDSEC')) {
+        if (code[p] === 9) {
+          cur = String(val[p]).trim();
+          out.header[cur] = {};
+          p++;
+          while (p < n && code[p] !== 9 && code[p] !== 0) {
+            var hk = code[p];
+            if (!out.header[cur][hk]) out.header[cur][hk] = [];
+            out.header[cur][hk].push(val[p]);
+            p++;
+          }
+        } else p++;
+      }
+      p++;
+    } else if (name === 'TABLES') {
+      var rec;
+      while (p < n && !(code[p] === 0 && String(val[p]).trim() === 'ENDSEC')) {
+        if (code[p] === 0) {
+          rec = readRec(p); p = rec.next;
+          if (rec.type === 'LAYER') {
+            var ln = str(rec.d, 2);
+            out.layers[ln] = {
+              name: ln,
+              color: isNaN(num(rec.d, 62)) ? 7 : num(rec.d, 62),
+              lineType: str(rec.d, 6) || 'CONTINUOUS',
+              lineWeight: isNaN(num(rec.d, 370)) ? -3 : num(rec.d, 370),
+              flags: isNaN(num(rec.d, 70)) ? 0 : num(rec.d, 70)
+            };
+          }
+        } else p++;
+      }
+      p++;
+    } else if (name === 'BLOCKS') {
+      var br;
+      while (p < n && !(code[p] === 0 && String(val[p]).trim() === 'ENDSEC')) {
+        if (code[p] !== 0) { p++; continue; }
+        br = readRec(p); p = br.next;
+        if (br.type !== 'BLOCK') continue;
+        var bname = str(br.d, 2);
+        var base = [num(br.d, 10) || 0, num(br.d, 20) || 0];
+        var ents = [];
+        while (p < n && !(code[p] === 0 && String(val[p]).trim() === 'ENDBLK')) {
+          if (code[p] !== 0) { p++; continue; }
+          var er = readRec(p); p = er.next;
+          if (er.type === 'VERTEX') {  // POLYLINE 的顶点：前置实体在下方统一处理，此处丢弃
+            continue;
+          }
+          ents.push(er);
+        }
+        if (p < n) { var eb = readRec(p); p = eb.next; }
+        if (bname.indexOf('*Model_Space') !== 0 && bname.indexOf('*Paper_Space') !== 0) {
+          out.blocks[bname] = { name: bname, base: base, entities: ents };
+        }
+      }
+      p++;
+    } else if (name === 'ENTITIES') {
+      while (p < n && !(code[p] === 0 && String(val[p]).trim() === 'ENDSEC')) {
+        if (code[p] !== 0) { p++; continue; }
+        var ar = readRec(p); p = ar.next;
+        if (ar.type === 'POLYLINE') {
+          // 聚合后续 VERTEX，直到 SEQEND
+          var verts = [];
+          var polyFlags = isNaN(num(ar.d, 70)) ? 0 : num(ar.d, 70);
+          while (p < n && !(code[p] === 0 && ['SEQEND', 'ENDSEC'].indexOf(String(val[p]).trim()) >= 0)) {
+            var vr = readRec(p); p = vr.next;
+            if (vr.type === 'VERTEX') verts.push(vr.d);
+          }
+          if (p < n && String(val[p]).trim() === 'SEQEND') { var sr = readRec(p); p = sr.next; }
+          var pd = {}; for (var pk in ar.d) pd[pk] = ar.d[pk].slice();
+          pd.CODE70 = [polyFlags];
+          pd.VERTEXDATA = verts;
+          out.entities.push({ type: 'POLYLINE', d: pd });
+        } else {
+          out.entities.push(ar);
+        }
+      }
+      p++;
+    } else {
+      while (p < n && !(code[p] === 0 && String(val[p]).trim() === 'ENDSEC')) p++;
+      p++;
+    }
+  }
+
+  var hv = out.header;
+  out.acadVer = (hv['$ACADVER'] && hv['$ACADVER'][1]) ? String(hv['$ACADVER'][1][0]).trim() : '';
+  out.codepage = (hv['$DWGCODEPAGE'] && hv['$DWGCODEPAGE'][3]) ? String(hv['$DWGCODEPAGE'][3][0]).trim() : '';
+  out.insUnits = (hv['$INSUNITS'] && hv['$INSUNITS'][70]) ? parseInt(hv['$INSUNITS'][70][0], 10) || 0 : 0;
+  out.measurement = (hv['$MEASUREMENT'] && hv['$MEASUREMENT'][70]) ? parseInt(hv['$MEASUREMENT'][70][0], 10) || 0 : 0;
+  var exMin = hv['$EXTMIN'], exMax = hv['$EXTMAX'];
+  if (exMin && exMin[10]) out.extMinHeader = [parseFloat(exMin[10][0]), parseFloat(exMin[20] ? exMin[20][0] : 'NaN')];
+  if (exMax && exMax[10]) out.extMaxHeader = [parseFloat(exMax[10][0]), parseFloat(exMax[20] ? exMax[20][0] : 'NaN')];
+  out._num = num; out._str = str;
+  return out;
+}
+
+/* ---------- 曲线离散 ---------- */
+/* 弦高容差 → 单步最大圆心角 */
+function maxStepAngle(r, tol) {
+  if (!(r > 0)) return Math.PI / 2;
+  if (tol >= r) return Math.PI / 2;
+  var c = 1 - tol / r;
+  if (c < -1) c = -1; if (c > 1) c = 1;
+  return 2 * Math.acos(c);
+}
+function arcPoints(cx, cy, r, a0, a1, tol, ccw) {
+  var sweep = a1 - a0;
+  if (ccw === undefined) ccw = true;
+  if (ccw) { while (sweep < 0) sweep += Math.PI * 2; }
+  else { while (sweep > 0) sweep -= Math.PI * 2; }
+  if (Math.abs(sweep) < 1e-12) sweep = ccw ? Math.PI * 2 : -Math.PI * 2;
+  var step = maxStepAngle(r, tol);
+  var k = Math.max(2, Math.ceil(Math.abs(sweep) / step));
+  var pts = [];
+  for (var i = 0; i <= k; i++) {
+    var a = a0 + sweep * (i / k);
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  /* 整圆：末点角度等于首点角度，但 cos/sin 的浮点误差会让两者差 ~1e-15，
+     而 eps=0 时要求端点比特级相等 → 直接令末点 = 首点，保证成环。 */
+  if (Math.abs(sweep) >= Math.PI * 2 - 1e-12 && pts.length > 1) pts[pts.length - 1] = pts[0].slice();
+  return pts;
+}
+/* 凸度(bulge) 圆弧段 */
+function bulgeSegment(p1, p2, b, tol) {
+  if (!b || Math.abs(b) < 1e-12) return [p1.slice(), p2.slice()];
+  var theta = 4 * Math.atan(b);
+  var dx = p2[0] - p1[0], dy = p2[1] - p1[1];
+  var d = Math.sqrt(dx * dx + dy * dy);
+  if (d < 1e-12) return [p1.slice(), p2.slice()];
+  var r = Math.abs(d / (2 * Math.sin(theta / 2)));
+  var mx = (p1[0] + p2[0]) / 2, my = (p1[1] + p2[1]) / 2;
+  var nx = -dy / d, ny = dx / d;               // 左法线
+  var h = (d / 2) / Math.tan(theta / 2);
+  var cx = mx + nx * h, cy = my + ny * h;
+  var a0 = Math.atan2(p1[1] - cy, p1[0] - cx);
+  var a1 = Math.atan2(p2[1] - cy, p2[0] - cx);
+  var pts = arcPoints(cx, cy, r, a0, a1, tol, theta > 0);
+  pts[0] = p1.slice(); pts[pts.length - 1] = p2.slice();
+  return pts;
+}
+/* NURBS 样条：自适应细分（de Boor 求值） */
+function splinePoints(degree, ctrl, knots, weights, tol, isClosed) {
+  var n = ctrl.length;
+  if (n < 2) return ctrl.map(function (p) { return p.slice(); });
+  var deg = Math.max(1, Math.min(degree, n - 1));
+  var rational = !!(weights && weights.length === n);
+  /* 缺失/异常节点矢量 → 生成均匀 clamped 节点 */
+  if (!knots || knots.length < n + deg + 1) {
+    knots = [];
+    var inner = n - deg - 1;
+    for (var i = 0; i <= deg; i++) knots.push(0);
+    for (var j = 1; j <= inner; j++) knots.push(j / (inner + 1));
+    for (var k = 0; k <= deg; k++) knots.push(1);
+  }
+  var u0 = knots[deg], u1 = knots[n];
+  function deboor(u) {
+    var k = deg;
+    for (var s = deg; s < n; s++) { if (u >= knots[s] && u <= knots[s + 1]) { k = s; break; } }
+    k = Math.max(deg, Math.min(n - 1, k));
+    var dx = [], dy = [], dw = [];
+    for (var i2 = 0; i2 <= deg; i2++) {
+      var idx = k - deg + i2;
+      var w = rational ? weights[idx] : 1;
+      dx.push(ctrl[idx][0] * w); dy.push(ctrl[idx][1] * w); dw.push(w);
+    }
+    for (var r = 1; r <= deg; r++) {
+      for (var i3 = deg; i3 >= r; i3--) {
+        var ii = k - deg + i3;
+        var den = knots[ii + deg - r + 1] - knots[ii];
+        var a = den === 0 ? 0 : (u - knots[ii]) / den;
+        dx[i3] = (1 - a) * dx[i3 - 1] + a * dx[i3];
+        dy[i3] = (1 - a) * dy[i3 - 1] + a * dy[i3];
+        dw[i3] = (1 - a) * dw[i3 - 1] + a * dw[i3];
+      }
+    }
+    var w0 = dw[deg] || 1;
+    return [dx[deg] / w0, dy[deg] / w0];
+  }
+  var out = [];
+  var guard = 0;
+  (function rec(t0, t1, p0, p1, depth) {
+    if (guard++ > 20000) return;
+    var tm = (t0 + t1) / 2;
+    var pm = deboor(tm);
+    var chord = dist(p0, p1);
+    var sag = chord < 1e-12 ? dist(p0, pm) : (function () {
+      var dx = p1[0] - p0[0], dy = p1[1] - p0[1];
+      var L2 = dx * dx + dy * dy;
+      var t = ((pm[0] - p0[0]) * dx + (pm[1] - p0[1]) * dy) / L2;
+      var cx = p0[0] + t * dx, cy = p0[1] + t * dy;
+      return Math.sqrt((pm[0] - cx) * (pm[0] - cx) + (pm[1] - cy) * (pm[1] - cy));
+    })();
+    if (depth >= 12 || sag <= tol) { out.push([t0, p0]); if (t1 >= 1 - 1e-9) out.push([t1, p1]); return; }
+    rec(t0, tm, p0, pm, depth + 1);
+    rec(tm, t1, pm, p1, depth + 1);
+  })(u0, u1, deboor(u0), deboor(u1), 0);
+  out.sort(function (a, b) { return a[0] - b[0]; });
+  var pts = out.map(function (o) { return o[1]; });
+  if (isClosed && pts.length > 2 && dist(pts[0], pts[pts.length - 1]) > 1e-9) pts.push(pts[0].slice());
+  return pts;
+}
+
+/* ---------- 实体 → 折线 ---------- */
+function applyXf(m, x, y) { return [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]; }
+function mulXf(a, b) {   // a∘b
+  return [
+    a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+    a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]
+  ];
+}
+var SUPPORTED = ['LINE', 'LWPOLYLINE', 'POLYLINE', 'ARC', 'CIRCLE', 'ELLIPSE', 'SPLINE', 'INSERT', 'POINT'];
+var IGNORED = ['TEXT', 'MTEXT', 'HATCH', 'DIMENSION', 'LEADER', 'MULTILEADER', 'ATTDEF', 'ATTRIB',
+  'SOLID', 'TRACE', '3DFACE', 'VIEWPORT', 'WIPEOUT', 'IMAGE', 'MESH', 'BODY', 'REGION',
+  'TOLERANCE', 'MLINE', 'XLINE', 'RAY', 'SEQEND', 'VERTEX', 'SHAPE'];
+
+function entitiesToPolylines(parsed, opt) {
+  var num = parsed._num, str = parsed._str;
+  var tol = opt.curveTol > 0 ? opt.curveTol : 0.02;
+  var polylines = [];
+  var unsupported = {};      // 不参与实体：类型 → 数量
+  var approximate = false;   // 是否含样条等近似几何
+  var depthLimit = 12;
+
+  function emit(pts, layer) {
+    if (!pts || pts.length < 2) return;
+    polylines.push({ pts: pts, layer: layer || '0' });
+  }
+
+  function conv(rec, m, depth) {
+    var t = rec.type, d = rec.d, i;
+    var layer = str(d, 8) || '0';
+
+    if (t === 'LINE') {
+      var a = applyXf(m, num(d, 10), num(d, 20)), b = applyXf(m, num(d, 11), num(d, 21));
+      emit([a, b], layer);
+      return;
+    }
+    if (t === 'POINT') {
+      var pp = applyXf(m, num(d, 10), num(d, 20));
+      emit([pp, pp], layer);   // 孤立点：参与诊断，不构成轮廓
+      return;
+    }
+    if (t === 'LWPOLYLINE') {
+      var xs = d[10] || [], ys = d[20] || [], bl = d[42] || [];
+      var closed = ((num(d, 70) || 0) & 1) === 1;
+      var vs = [];
+      for (i = 0; i < xs.length; i++) vs.push([parseFloat(xs[i]), parseFloat(ys[i] || '0')]);
+      if (!vs.length) return;
+      var out = [];
+      /* 闭合多段线：i 走到 vs.length（含收尾段），保留重复的收尾顶点，
+         由端点归并把它合并回起点 → 得到真正的闭环（不能 pop 掉，否则丢最后一条边） */
+      var last = closed ? vs.length : vs.length - 1;
+      for (i = 0; i < last; i++) {
+        var p1 = vs[i], p2 = vs[(i + 1) % vs.length];
+        var bg = i < bl.length ? parseFloat(bl[i]) : 0;
+        var seg = bulgeSegment(p1, p2, isNaN(bg) ? 0 : bg, tol);
+        if (out.length) out.pop();
+        out = out.concat(seg);
+      }
+      emit(out.map(function (p2v) { return applyXf(m, p2v[0], p2v[1]); }), layer);
+      return;
+    }
+    if (t === 'POLYLINE') {
+      var vd = d.VERTEXDATA || [];
+      var cl = ((num(d, 70) || 0) & 1) === 1;
+      var vs2 = [], bl2 = [];
+      for (i = 0; i < vd.length; i++) {
+        vs2.push([num(vd[i], 10), num(vd[i], 20)]);
+        bl2.push(isNaN(num(vd[i], 42)) ? 0 : num(vd[i], 42));
+      }
+      if (!vs2.length) return;
+      var out2 = [];
+      var last2 = cl ? vs2.length : vs2.length - 1;
+      for (i = 0; i < last2; i++) {
+        var q1 = vs2[i], q2 = vs2[(i + 1) % vs2.length];
+        var seg2 = bulgeSegment(q1, q2, bl2[i] || 0, tol);
+        if (out2.length) out2.pop();
+        out2 = out2.concat(seg2);
+      }
+      emit(out2.map(function (p2v) { return applyXf(m, p2v[0], p2v[1]); }), layer);
+      return;
+    }
+    if (t === 'ARC') {
+      var cx = num(d, 10), cy = num(d, 20), r = num(d, 40);
+      var a0 = (num(d, 50) || 0) * DEG, a1 = (num(d, 51) || 0) * DEG;
+      emit(arcPoints(cx, cy, r, a0, a1, tol, true).map(function (p2v) { return applyXf(m, p2v[0], p2v[1]); }), layer);
+      return;
+    }
+    if (t === 'CIRCLE') {
+      var c2x = num(d, 10), c2y = num(d, 20), r2 = num(d, 40);
+      emit(arcPoints(c2x, c2y, r2, 0, Math.PI * 2, tol, true).map(function (p2v) { return applyXf(m, p2v[0], p2v[1]); }), layer);
+      return;
+    }
+    if (t === 'ELLIPSE') {
+      var ex = num(d, 10), ey = num(d, 20);
+      var vx = num(d, 11), vy = num(d, 21);
+      var ratio = num(d, 40); if (!(ratio > 0)) ratio = 1;
+      var A = Math.sqrt(vx * vx + vy * vy); if (!(A > 0)) return;
+      var B = A * ratio;
+      var ux = vx / A, uy = vy / A, wx = -uy, wy = ux;
+      var t0 = isNaN(num(d, 41)) ? 0 : num(d, 41);
+      var t1 = isNaN(num(d, 42)) ? Math.PI * 2 : num(d, 42);
+      while (t1 <= t0) t1 += Math.PI * 2;
+      var step = maxStepAngle(Math.max(A, B), tol);
+      var kk = Math.max(2, Math.ceil((t1 - t0) / step));
+      var ep = [];
+      for (i = 0; i <= kk; i++) {
+        var tt = t0 + (t1 - t0) * (i / kk);
+        ep.push([ex + A * Math.cos(tt) * ux + B * Math.sin(tt) * wx,
+                 ey + A * Math.cos(tt) * uy + B * Math.sin(tt) * wy]);
+      }
+      /* 整椭圆：同上，末点严格取首点 */
+      if ((t1 - t0) >= Math.PI * 2 - 1e-12 && ep.length > 1) ep[ep.length - 1] = ep[0].slice();
+      emit(ep.map(function (p2v) { return applyXf(m, p2v[0], p2v[1]); }), layer);
+      return;
+    }
+    if (t === 'SPLINE') {
+      var deg = num(d, 71); if (isNaN(deg) || deg < 1) deg = 3;
+      var xs3 = d[10] || [], ys3 = d[20] || [];
+      var ctrl = [];
+      for (i = 0; i < xs3.length; i++) ctrl.push([parseFloat(xs3[i]), parseFloat(ys3[i] || '0')]);
+      var knots = (d[40] || []).map(parseFloat);
+      var wts = (d[42] || []).map(parseFloat);
+      var flags = num(d, 70) || 0;
+      var sp = splinePoints(deg, ctrl, knots, wts, tol, (flags & 1) === 1);
+      approximate = true;
+      emit(sp.map(function (p2v) { return applyXf(m, p2v[0], p2v[1]); }), layer);
+      return;
+    }
+    if (t === 'INSERT') {
+      if (depth >= depthLimit) return;
+      var bn = str(d, 2);
+      var blk = parsed.blocks[bn];
+      if (!blk) { unsupported['INSERT(缺失块:' + bn + ')'] = (unsupported['INSERT(缺失块:' + bn + ')'] || 0) + 1; return; }
+      var ix = num(d, 10) || 0, iy = num(d, 20) || 0;
+      var sx = isNaN(num(d, 41)) ? 1 : num(d, 41);
+      var sy = isNaN(num(d, 42)) ? 1 : num(d, 42);
+      var rot = (num(d, 50) || 0) * DEG;
+      var ncol = Math.max(1, num(d, 70) || 1), nrow = Math.max(1, num(d, 71) || 1);
+      var csp = num(d, 44) || 0, rsp = num(d, 45) || 0;
+      var ca = Math.cos(rot), sa = Math.sin(rot);
+      for (var cc = 0; cc < ncol; cc++) {
+        for (var rr = 0; rr < nrow; rr++) {
+          var ox = cc * csp, oy = rr * rsp;
+          var lx = ix + ox * ca - oy * sa;
+          var ly = iy + ox * sa + oy * ca;
+          var ins = [ca * sx, sa * sx, -sa * sy, ca * sy, lx, ly];
+          var inner = mulXf(m, ins);
+          for (var e2 = 0; e2 < blk.entities.length; e2++) conv(blk.entities[e2], inner, depth + 1);
+        }
+      }
+      return;
+    }
+    /* 其余：记为不参与实体 */
+    if (IGNORED.indexOf(t) < 0 && t) unsupported[t] = (unsupported[t] || 0) + 1;
+    else if (t) unsupported[t] = (unsupported[t] || 0) + 1;
+  }
+
+  var I = [1, 0, 0, 1, 0, 0];
+  for (var i = 0; i < parsed.entities.length; i++) conv(parsed.entities[i], I, 0);
+
+  return { polylines: polylines, unsupported: unsupported, approximate: approximate };
+}
+
+/* ---------- 端点归并 → 图 ---------- */
+function flattenToGraph(polylines, eps) {
+  var pts = [], cell = new Map(), edges = [], seen = new Set();
+  var dupSeg = 0, snapped = 0;
+
+  function keyExact(x, y) { return x + ',' + y; }
+  function findOrAdd(x, y) {
+    if (!(eps > 0)) {
+      var k = keyExact(x, y), id = cell.get(k);
+      if (id !== undefined) return id;
+      id = pts.length; pts.push([x, y]); cell.set(k, id); return id;
+    }
+    var gx = Math.round(x / eps), gy = Math.round(y / eps), best = -1, bd = eps;
+    for (var dx = -1; dx <= 1; dx++) {
+      for (var dy = -1; dy <= 1; dy++) {
+        var lst = cell.get((gx + dx) + '|' + (gy + dy));
+        if (!lst) continue;
+        for (var q = 0; q < lst.length; q++) {
+          var p = pts[lst[q]];
+          var dd = Math.sqrt((p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y));
+          if (dd <= bd) { bd = dd; best = lst[q]; }
+        }
+      }
+    }
+    if (best >= 0) { if (bd > 1e-12) snapped++; return best; }
+    var id2 = pts.length; pts.push([x, y]);
+    var ck = gx + '|' + gy;
+    if (!cell.has(ck)) cell.set(ck, []);
+    cell.get(ck).push(id2);
+    return id2;
+  }
+
+  for (var i = 0; i < polylines.length; i++) {
+    var pl = polylines[i].pts;
+    for (var j = 0; j + 1 < pl.length; j++) {
+      var x1 = pl[j][0], y1 = pl[j][1], x2 = pl[j + 1][0], y2 = pl[j + 1][1];
+      if (x1 === x2 && y1 === y2) continue;                 // 退化段
+      var a = findOrAdd(x1, y1), b = findOrAdd(x2, y2);
+      if (a === b) continue;
+      var ek = a < b ? a + '-' + b : b + '-' + a;
+      if (seen.has(ek)) { dupSeg++; continue; }
+      seen.add(ek);
+      edges.push({ a: a, b: b, layer: polylines[i].layer });
+    }
+  }
+  return { points: pts, edges: edges, dupSegments: dupSeg, snapped: snapped };
+}
+
+/* ---------- 链化（L1 → L2 → L3） ---------- */
+function buildChains(points, edges) {
+  var adj = new Map();
+  for (var i = 0; i < edges.length; i++) {
+    var e = edges[i];
+    if (!adj.has(e.a)) adj.set(e.a, []);
+    if (!adj.has(e.b)) adj.set(e.b, []);
+    adj.get(e.a).push({ e: i, to: e.b });
+    adj.get(e.b).push({ e: i, to: e.a });
+  }
+  var used = new Uint8Array(edges.length);
+  var chains = [];
+  var branch = 0;
+  adj.forEach(function (lst) { if (lst.length >= 3) branch++; });
+
+  function walk(start) {
+    var ids = [start], cur = start, prev = -1;
+    for (var guard = 0; guard <= edges.length + 2; guard++) {
+      var lst = adj.get(cur) || [], pick = -1, best = -2;
+      for (var q = 0; q < lst.length; q++) {
+        var c = lst[q];
+        if (used[c.e]) continue;
+        if (prev < 0 || lst.length === 1) { pick = c.e; break; }
+        var ax = points[cur][0] - points[prev][0], ay = points[cur][1] - points[prev][1];
+        var bx = points[c.to][0] - points[cur][0], by = points[c.to][1] - points[cur][1];
+        var la = Math.sqrt(ax * ax + ay * ay) || 1, lb = Math.sqrt(bx * bx + by * by) || 1;
+        var dot = (ax * bx + ay * by) / (la * lb);
+        if (dot > best) { best = dot; pick = c.e; }
+      }
+      if (pick < 0) break;
+      used[pick] = 1;
+      var nxt = edges[pick].a === cur ? edges[pick].b : edges[pick].a;
+      ids.push(nxt);
+      prev = cur; cur = nxt;
+      if (cur === start) break;
+    }
+    return ids;
+  }
+
+  var starts = [];
+  adj.forEach(function (lst, id) { if (lst.length !== 2) starts.push(id); });
+  starts.sort(function (x, y) { return adj.get(x).length - adj.get(y).length; });
+  starts.forEach(function (id) {
+    for (;;) {
+      var free = (adj.get(id) || []).some(function (c) { return !used[c.e]; });
+      if (!free) break;
+      var ids = walk(id);
+      if (ids.length > 1) chains.push(ids);
+    }
+  });
+  for (var k = 0; k < edges.length; k++) {
+    if (used[k]) continue;
+    var ids2 = walk(edges[k].a);
+    if (ids2.length > 1) chains.push(ids2);
+  }
+
+  var out = chains.map(function (ids) {
+    var closed = ids.length > 3 && ids[0] === ids[ids.length - 1];
+    return { ids: closed ? ids.slice(0, ids.length - 1) : ids, closed: closed };
+  });
+  /* 单点/两点退化链剔除 */
+  out = out.filter(function (c) { return c.ids.length >= 2; });
+  return { chains: out, branchPoints: branch };
+}
+
+/* ---------- 断口诊断 ---------- */
+function computeGaps(points, chains, probe) {
+  var ends = [];
+  for (var i = 0; i < chains.length; i++) {
+    var c = chains[i];
+    if (c.closed) continue;
+    ends.push({ c: i, id: c.ids[0] });
+    if (c.ids.length > 1) ends.push({ c: i, id: c.ids[c.ids.length - 1] });
+  }
+  if (ends.length < 2) return { count: 0, max: 0, openEnds: ends.length };
+  var cand = [];
+  for (var a = 0; a < ends.length; a++) {
+    for (var b = a + 1; b < ends.length; b++) {
+      if (ends[a].c === ends[b].c && ends[a].id === ends[b].id) continue;
+      var d = dist(points[ends[a].id], points[ends[b].id]);
+      if (d <= probe) cand.push({ a: a, b: b, d: d });
+    }
+  }
+  cand.sort(function (x, y) { return x.d - y.d; });
+  var taken = new Set(), count = 0, max = 0;
+  for (var q = 0; q < cand.length; q++) {
+    if (taken.has(cand[q].a) || taken.has(cand[q].b)) continue;
+    taken.add(cand[q].a); taken.add(cand[q].b);
+    count++; if (cand[q].d > max) max = cand[q].d;
+  }
+  return { count: count, max: max, openEnds: ends.length };
+}
+
+/* ---------- Douglas-Peucker（显式栈） ---------- */
+function dpSimplify(pts, tol) {
+  var n = pts.length;
+  if (n <= 2) return pts.map(function (p) { return p.slice(); });
+  var keep = new Uint8Array(n);
+  keep[0] = 1; keep[n - 1] = 1;
+  var stack = [[0, n - 1]];
+  while (stack.length) {
+    var seg = stack.pop(), s = seg[0], e = seg[1];
+    if (e <= s + 1) continue;
+    var ax = pts[s][0], ay = pts[s][1], bx = pts[e][0], by = pts[e][1];
+    var dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+    var maxD = -1, idx = -1;
+    for (var i = s + 1; i < e; i++) {
+      var px = pts[i][0], py = pts[i][1], d;
+      if (L2 === 0) { d = Math.sqrt((px - ax) * (px - ax) + (py - ay) * (py - ay)); }
+      else {
+        var t = ((px - ax) * dx + (py - ay) * dy) / L2;
+        var cx = ax + t * dx, cy = ay + t * dy;
+        d = Math.sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+      }
+      if (d > maxD) { maxD = d; idx = i; }
+    }
+    if (maxD > tol) { keep[idx] = 1; stack.push([s, idx], [idx, e]); }
+  }
+  var res = [];
+  for (var q = 0; q < n; q++) if (keep[q]) res.push(pts[q]);
+  return res;
+}
+/* 闭合环：以最远点为切分锚点，拆成两段开口链分别简化后合并 */
+function simplifyClosed(pts, tol) {
+  var n = pts.length;
+  if (n <= 4) return pts.map(function (p) { return p.slice(); });
+  var bi = 0, bd = -1;
+  for (var i = 1; i < n; i++) {
+    var d = dist(pts[0], pts[i]);
+    if (d > bd) { bd = d; bi = i; }
+  }
+  if (bi < 1) return pts.map(function (p) { return p.slice(); });
+  var p1 = pts.slice(0, bi + 1);
+  var p2 = pts.slice(bi).concat([pts[0]]);
+  var s1 = dpSimplify(p1, tol), s2 = dpSimplify(p2, tol);
+  return s1.concat(s2.slice(1, -1));
+}
+/* 按顶点保留比例简化（二分搜索容差） */
+function simplifyByRatio(pts, closed, ratio) {
+  var n = pts.length;
+  if (!(ratio < 1) || n <= 2) return { pts: pts.map(function (p) { return p.slice(); }), tol: 0, count: n };
+  var target = Math.max(2, Math.round(n * ratio));
+  function run(tol) { return closed ? simplifyClosed(pts, tol) : dpSimplify(pts, tol); }
+  var all = bboxOf([{ ids: null, pts: pts }]);
+  var diag = Math.sqrt(Math.pow(all.w, 2) + Math.pow(all.h, 2)) || 1;
+  var lo = 0, hi = diag, bestTol = 0, bestDiff = Infinity, bestCount = n, limit = closed ? 220 : 4000;
+  for (var it = 0; it < 34; it++) {
+    var mid = (lo + hi) / 2;
+    var c = run(mid).length;
+    var diff = Math.abs(c - target);
+    if (diff < bestDiff) { bestTol = mid; bestDiff = diff; bestCount = c; }
+    if (c > target) lo = mid; else hi = mid;
+    if (hi - lo < diag * 1e-9) break;
+  }
+  var res = run(bestTol);
+  /* 收敛精度不足时，就近微调（最多 3 次） */
+  if (res.length !== target && res.length > 2) {
+    var dir = res.length > target ? 1 : -1;
+    for (var k = 1; k <= 3; k++) {
+      var t2 = bestTol * (1 + dir * 0.18 * k) + dir * diag * 1e-4 * k;
+      if (t2 < 0) t2 = 0;
+      if (t2 > limit) break;
+      var r2 = run(t2);
+      if (Math.abs(r2.length - target) < Math.abs(res.length - target)) { res = r2; bestTol = t2; }
+    }
+  }
+  return { pts: res, tol: bestTol, count: res.length };
+}
+
+/* ---------- 统计 ---------- */
+function bboxOf(chains) {
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, n = 0;
+  for (var i = 0; i < chains.length; i++) {
+    var p = chains[i].pts;
+    for (var j = 0; j < p.length; j++) {
+      n++;
+      if (p[j][0] < minX) minX = p[j][0];
+      if (p[j][1] < minY) minY = p[j][1];
+      if (p[j][0] > maxX) maxX = p[j][0];
+      if (p[j][1] > maxY) maxY = p[j][1];
+    }
+  }
+  if (!n) return { minX: 0, minY: 0, maxX: 0, maxY: 0, w: 0, h: 0, n: 0 };
+  return { minX: minX, minY: minY, maxX: maxX, maxY: maxY, w: maxX - minX, h: maxY - minY, n: n };
+}
+/* 最大偏差：原折线每点到简化折线的最小距离 */
+function maxDeviation(orig, simp, closed) {
+  if (orig.length < 2 || simp.length < 2) return 0;
+  var segs = [];
+  for (var i = 0; i + 1 < simp.length; i++) segs.push([simp[i], simp[i + 1]]);
+  if (closed) segs.push([simp[simp.length - 1], simp[0]]);
+  var max = 0, budget = 4e6;
+  var stride = Math.max(1, Math.ceil(orig.length * segs.length / budget));
+  for (var p = 0; p < orig.length; p += stride) {
+    var pt = orig[p], best = Infinity;
+    for (var s = 0; s < segs.length; s++) {
+      var a = segs[s][0], b = segs[s][1];
+      var dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy, d;
+      if (L2 === 0) d = Math.sqrt((pt[0] - a[0]) * (pt[0] - a[0]) + (pt[1] - a[1]) * (pt[1] - a[1]));
+      else {
+        var t = ((pt[0] - a[0]) * dx + (pt[1] - a[1]) * dy) / L2;
+        t = t < 0 ? 0 : (t > 1 ? 1 : t);
+        var cx = a[0] + t * dx, cy = a[1] + t * dy;
+        d = Math.sqrt((pt[0] - cx) * (pt[0] - cx) + (pt[1] - cy) * (pt[1] - cy));
+      }
+      if (d < best) best = d;
+    }
+    if (best > max) max = best;
+    if (max > 1e6) break;
+  }
+  return isFinite(max) ? max : 0;
+}
+
+/* ---------- SVG 输出 ---------- */
+function svgFor(chains, box, o) {
+  var s = o.unitScale;
+  /* width/height 与 viewBox 取同一个数（mm，6 位小数）→ 缩放系数严格为 1，
+     既不影响 stroke-width，也保证浏览器/Inkscape 实测尺寸即为图纸真实毫米尺寸。
+     overflow="visible" 让描边（以路径为中心、向外扩半个线宽）不被根元素裁掉。 */
+  var W = Math.round(box.w * s * 1e6) / 1e6;
+  var H = Math.round(box.h * s * 1e6) / 1e6;
+  var Ws = fmt(W, 6), Hs = fmt(H, 6);
+  var vb = o.keepOffset
+    ? [fmt(box.minX * s, 6), fmt(box.minY * s, 6), Ws, Hs].join(' ')
+    : ['0', '0', Ws, Hs].join(' ');
+  var parts = ['<?xml version="1.0" encoding="UTF-8"?>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' + Ws + 'mm" height="' + Hs + 'mm" viewBox="' + vb + '" overflow="visible">'];
+  var tf = o.keepOffset
+    ? 'matrix(1 0 0 -1 0 ' + fmt((box.minY + box.maxY) * s, 6) + ')'
+    : 'matrix(1 0 0 -1 ' + fmt(-box.minX * s, 6) + ' ' + fmt(box.maxY * s, 6) + ')';
+  var head = ' fill="none" stroke="' + o.strokeColor + '" stroke-width="' + fmt(o.strokeWidth, 4) +
+    '" stroke-linejoin="round" stroke-linecap="round"';
+  function dOf(pts, closed) {
+    var d = 'M' + fmt(pts[0][0] * s, 6) + ' ' + fmt(pts[0][1] * s, 6);
+    for (var i = 1; i < pts.length; i++) d += 'L' + fmt(pts[i][0] * s, 6) + ' ' + fmt(pts[i][1] * s, 6);
+    if (closed) d += 'Z';
+    return d;
+  }
+  if (o.singlePath && chains.length > 1) {
+    var dAll = chains.map(function (c) { return dOf(c.pts, c.closed); }).join('');
+    parts.push('  <path d="' + dAll + '" transform="' + tf + '"' + head + '/>');
+  } else {
+    for (var i = 0; i < chains.length; i++) {
+      parts.push('  <path d="' + dOf(chains[i].pts, chains[i].closed) + '" transform="' + tf + '"' + head + '/>');
+    }
+  }
+  parts.push('</svg>');
+  return parts.join('\n') + '\n';
+}
+
+/* ---------- DXF 输出（最小 R2000 + LWPOLYLINE，$EXTMIN/$EXTMAX 正确回填） ---------- */
+function dxfFor(chains, box, o) {
+  var L = [];
+  function p(c, v) { L.push(String(c)); L.push(String(v)); }
+  p(999, 'generated by dxf-toolkit');
+  p(0, 'SECTION'); p(2, 'HEADER');
+  p(9, '$ACADVER'); p(1, 'AC1015');
+  p(9, '$DWGCODEPAGE'); p(3, 'ANSI_1252');
+  p(9, '$INSUNITS'); p(70, o.keepOffset ? 4 : 4);
+  p(9, '$MEASUREMENT'); p(70, 1);
+  p(9, '$EXTMIN'); p(10, fmt(box.minX, 10)); p(20, fmt(box.minY, 10)); p(30, '0');
+  p(9, '$EXTMAX'); p(10, fmt(box.maxX, 10)); p(20, fmt(box.maxY, 10)); p(30, '0');
+  p(0, 'ENDSEC');
+  p(0, 'SECTION'); p(2, 'TABLES');
+  p(0, 'TABLE'); p(2, 'LAYER'); p(5, '2'); p(100, 'AcDbSymbolTable'); p(70, 1);
+  p(0, 'LAYER'); p(5, '10'); p(100, 'AcDbSymbolTableRecord'); p(100, 'AcDbLayerTableRecord');
+  p(2, '0'); p(70, 0); p(62, 7); p(6, 'CONTINUOUS'); p(370, Math.round(o.strokeWidth * 100) || -3);
+  p(0, 'ENDTAB'); p(0, 'ENDSEC');
+  p(0, 'SECTION'); p(2, 'ENTITIES');
+  var h = 0x100;
+  for (var i = 0; i < chains.length; i++) {
+    var c = chains[i], pts = c.pts;
+    p(0, 'LWPOLYLINE'); p(5, (h++).toString(16).toUpperCase());
+    p(100, 'AcDbEntity'); p(8, '0');
+    p(100, 'AcDbPolyline'); p(90, pts.length); p(70, c.closed ? 1 : 0);
+    for (var j = 0; j < pts.length; j++) {
+      p(10, fmt(pts[j][0], 10)); p(20, fmt(pts[j][1], 10));
+    }
+  }
+  p(0, 'ENDSEC'); p(0, 'EOF');
+  return L.join('\r\n') + '\r\n';
+}
+
+/* ---------- CRC32 + store-only ZIP ---------- */
+var CRC_TABLE = (function () {
+  var t = new Uint32Array(256);
+  for (var i = 0; i < 256; i++) {
+    var c = i;
+    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  var c = 0xFFFFFFFF;
+  for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipStore(files) {
+  var enc = new TextEncoder();
+  var chunks = [], central = [], offset = 0;
+  function u16(a, v) { a.push(v & 255, (v >>> 8) & 255); }
+  function u32(a, v) { a.push(v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255); }
+  files.forEach(function (f) {
+    var nameB = enc.encode(f.name), data = f.data, crc = crc32(data);
+    var lh = [0x50, 0x4B, 0x03, 0x04];
+    u16(lh, 20); u16(lh, 0); u16(lh, 0); u16(lh, 0); u16(lh, 0);
+    u32(lh, crc); u32(lh, data.length); u32(lh, data.length);
+    u16(lh, nameB.length); u16(lh, 0);
+    var lhB = new Uint8Array(lh);
+    chunks.push(lhB, nameB, data);
+    var ch = [0x50, 0x4B, 0x01, 0x02];
+    u16(ch, 20); u16(ch, 20); u16(ch, 0); u16(ch, 0); u16(ch, 0); u16(ch, 0);
+    u32(ch, crc); u32(ch, data.length); u32(ch, data.length);
+    u16(ch, nameB.length); u16(ch, 0); u16(ch, 0); u16(ch, 0); u16(ch, 0);
+    u32(ch, 0); u32(ch, offset);
+    central.push(new Uint8Array(ch), nameB);
+    offset += lhB.length + nameB.length + data.length;
+  });
+  var cdSize = central.reduce(function (a, b) { return a + b.length; }, 0);
+  var eocd = [0x50, 0x4B, 0x05, 0x06];
+  u16(eocd, 0); u16(eocd, 0); u16(eocd, files.length); u16(eocd, files.length);
+  u32(eocd, cdSize); u32(eocd, offset); u16(eocd, 0);
+  return new Blob(chunks.concat(central, [new Uint8Array(eocd)]), { type: 'application/zip' });
+}
+/* ============================================================================
+ * 挤出内核（三维数模）：区域三角化 + 实体化 + STL 写出 + 自检
+ *
+ * 三条铁律（均由实测得出，改动前务必先读）：
+ *  ① 挤出轮廓一律取 finish() 的 chains[i].pts，**绝不做「转角阈值」清理** ——
+ *     转角阈值没有误差上界：实测 0.05° → 0.046 mm 尚可，但 0.1° → 0.971 mm、
+ *     0.5° → 13.59 mm（删除连续低转角顶点会把整段弧一次拉成弦，误差累积）。
+ *     Douglas-Peucker 有形状误差上界保证，这是它不可被替代的原因。
+ *  ② DP 简化只删点不增点，会连图纸的极值点一起删掉 → 模型比图纸小
+ *     （实测极简档小 0.199 / 0.180 mm，属 A-05 同类问题）。必须用
+ *     reinsertExtremes 把包围盒极值点按原始顺序插回环中。插回被删的点
+ *     **只会让形状更接近原图**，是双向严格改进。
+ *  ③ 顶点表必须先量化到 float32、再建三角形，且盖面与侧壁引用**同一张**顶点表
+ *     → 水密性由构造保证，而不是事后修补。
+ * ==========================================================================*/
+function polyArea2(a, b, c) {
+  return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+}
+function ringSignedArea(P) {
+  var s = 0;
+  for (var i = 0; i < P.length; i++) {
+    var a = P[i], b = P[(i + 1) % P.length];
+    s += a[0] * b[1] - b[0] * a[1];
+  }
+  return s / 2;
+}
+/* 点是否落在三角形内（含边界 —— 保守判定，宁可漏切耳也不误切） */
+function pointInTri(p, a, b, c) {
+  return polyArea2(a, b, p) >= 0 && polyArea2(b, c, p) >= 0 && polyArea2(c, a, p) >= 0;
+}
+/* 按索引序列求带符号面积（等价 ringSignedArea，但可用于「子环 / 桥接后序列」） */
+function ringAreaOf(P, idx) {
+  var s = 0, n = idx.length;
+  for (var i = 0; i < n; i++) {
+    var a = P[idx[i]], b = P[idx[(i + 1) % n]];
+    s += a[0] * b[1] - b[0] * a[1];
+  }
+  return s / 2;
+}
+function samePt(a, b) { return a[0] === b[0] && a[1] === b[1]; }
+/* 耳切三角化。返回「顶点索引三元组」，索引指向输入 P ——
+   这是水密性的关键：盖面与侧壁共享同一张顶点表，不是各自复制坐标。
+   idxIn 可选：传入自定义索引序列，即可对「桥接后的带孔环」三角化 ——
+   于是孔洞不需要另写一套三角化算法，复用同一个已验证的 earClip。 */
+function earClip(P, idxIn) {
+  var idx = [], i;
+  if (idxIn) { for (i = 0; i < idxIn.length; i++) idx.push(idxIn[i]); }
+  else { for (i = 0; i < P.length; i++) idx.push(i); }
+  var n = idx.length;
+  if (n < 3) return { tris: [], stats: { fallback: 0, minArea: 0 }, area: 0 };
+  var area0 = ringAreaOf(P, idx);
+  if (area0 < 0) throw new Error('earClip 要求 CCW 输入序列');
+  var out = [], fallback = 0, minArea = Infinity, guard = 0, limit = n * 4 + 64;
+  while (idx.length > 3) {
+    if (++guard > limit) throw new Error('earClip 未收敛');
+    var m = idx.length, done = false;
+    /* 第一轮：只切「真耳」—— 凸顶点且三角形内无其他顶点（bbox 预筛加速） */
+    for (var k = 0; k < m; k++) {
+      var i0 = idx[(k - 1 + m) % m], i1 = idx[k], i2 = idx[(k + 1) % m];
+      var a = P[i0], b = P[i1], c = P[i2];
+      var ar2 = polyArea2(a, b, c);
+      if (ar2 <= 0) continue;                        /* 凹顶点或零面积 → 不是耳 */
+      var minx = Math.min(a[0], b[0], c[0]), maxx = Math.max(a[0], b[0], c[0]);
+      var miny = Math.min(a[1], b[1], c[1]), maxy = Math.max(a[1], b[1], c[1]);
+      var blocked = false;
+      for (var q = 0; q < m; q++) {
+        var iq = idx[q];
+        if (iq === i0 || iq === i1 || iq === i2) continue;
+        var p = P[iq];
+        /* 桥接会在环上留下**坐标重合的两个不同索引**（桥的两端各出现两次）。
+           它们与耳的顶点坐标完全相同时必须跳过，否则会被判成"在三角形内"而
+           把所有耳都堵死，逼算法走兜底并产出退化面。 */
+        if (samePt(p, a) || samePt(p, b) || samePt(p, c)) continue;
+        if (p[0] < minx || p[0] > maxx || p[1] < miny || p[1] > maxy) continue;
+        if (pointInTri(p, a, b, c)) { blocked = true; break; }
+      }
+      if (blocked) continue;
+      out.push([i0, i1, i2]);
+      var ar = Math.abs(ar2) / 2;
+      if (ar < minArea) minArea = ar;
+      idx.splice(k, 1); done = true; break;
+    }
+    if (done) continue;
+    /* 第二轮兜底：所有耳都被阻塞时，取面积最大的凸顶点强切，保证算法终止。
+       实测样例环（非常平滑的闭合曲线）兜底触发 0 次。 */
+    var best = -1, bestA = -Infinity;
+    for (var k2 = 0; k2 < idx.length; k2++) {
+      var mm = idx.length;
+      var j0 = idx[(k2 - 1 + mm) % mm], j1 = idx[k2], j2 = idx[(k2 + 1) % mm];
+      var a2 = polyArea2(P[j0], P[j1], P[j2]);
+      if (a2 > bestA) { bestA = a2; best = k2; }
+    }
+    if (best < 0) throw new Error('earClip 兜底失败');
+    var mb = idx.length;
+    var b0 = idx[(best - 1 + mb) % mb], b1 = idx[best], b2 = idx[(best + 1) % mb];
+    out.push([b0, b1, b2]);
+    fallback++;
+    var arb = Math.abs(polyArea2(P[b0], P[b1], P[b2])) / 2;
+    if (arb < minArea) minArea = arb;
+    idx.splice(best, 1);
+  }
+  out.push([idx[0], idx[1], idx[2]]);
+  var arl = Math.abs(polyArea2(P[idx[0]], P[idx[1]], P[idx[2]])) / 2;
+  if (arl < minArea) minArea = arl;
+  return { tris: out, stats: { fallback: fallback, minArea: minArea }, area: Math.abs(area0) };
+}
+
+/* ============================================================================
+ * 嵌套轮廓（孔洞）：自动判定 + 带孔三角化
+ *
+ * 为什么必须做：挤出要求「实体区域」。若把内环当独立实体处理，外板会把孔位
+ * 整个盖住（孔被填实），内环自己又变成一个埋在板里的多余实体。
+ *
+ * 判定规则：按**嵌套深度**的奇偶定角色 —— 深度 0 实体、1 孔洞、2 孔中之岛…
+ * 交叉校验：CAD 的通行约定是「外轮廓 CCW、孔洞 CW」，因此方向可作旁证；
+ * 两者不一致时报警（不静默采用其中之一）。
+ * ==========================================================================*/
+/* 环 A 是否整体落在环 B 内部：抽样多个顶点统计比例。
+   比「只取一个探测点」稳得多 —— 单点可能正好落在父环边界上而误判。 */
+function ringInsideRing(inner, outer) {
+  var n = inner.length, step = Math.max(1, Math.floor(n / 64)), tot = 0, inn = 0;
+  for (var i = 0; i < n; i += step) {
+    tot++;
+    if (pointInRing(inner[i], outer)) inn++;
+  }
+  return tot > 0 && (inn / tot) >= 0.98;
+}
+/* 嵌套关系：depth = 包含本环的环数；parent = 面积最小的那个包含者（直接父环） */
+function buildNesting(rings) {
+  var k = rings.length, depth = [], parent = [], inside = [];
+  for (var i = 0; i < k; i++) {
+    depth.push(0); parent.push(-1);
+    inside.push([]);
+  }
+  for (var a = 0; a < k; a++) {
+    var cnt = 0, par = -1, best = Infinity;
+    for (var b = 0; b < k; b++) {
+      if (a === b) continue;
+      if (ringInsideRing(rings[a], rings[b])) {
+        cnt++; inside[a].push(b);
+        var ab = Math.abs(ringSignedArea(rings[b]));
+        if (ab < best) { best = ab; par = b; }
+      }
+    }
+    depth[a] = cnt; parent[a] = par;
+  }
+  return { depth: depth, parent: parent, inside: inside };
+}
+/* 规划实体分组：auto 模式按深度奇偶；fill 模式全部当独立实体（即旧行为）。
+   overrides 允许逐环人工指定 solid / hole / skip（自动为主、手动可覆写）。 */
+function planSolids(rings, nesting, mode, overrides) {
+  var k = rings.length, roles = [], groups = [], i;
+  for (i = 0; i < k; i++) {
+    var auto = (nesting.depth[i] % 2 === 1) ? 'hole' : 'solid';
+    var ov = overrides && overrides[i];
+    var role = (ov === 'solid' || ov === 'hole' || ov === 'skip') ? ov
+      : (mode === 'fill' ? 'solid' : auto);
+    roles.push({ i: i, depth: nesting.depth[i], parent: nesting.parent[i], auto: auto, role: role,
+      ccw: ringSignedArea(rings[i]) > 0 });
+  }
+  for (i = 0; i < k; i++) {
+    if (roles[i].role !== 'solid') continue;
+    groups.push({ outer: i, holes: [], depth: roles[i].depth });
+  }
+  for (i = 0; i < k; i++) {
+    if (roles[i].role !== 'hole') continue;
+    /* 挂到直接父环所在的组 */
+    var par = roles[i].parent, gi = -1;
+    for (var g = 0; g < groups.length; g++) if (groups[g].outer === par) gi = g;
+    if (gi >= 0) { groups[gi].holes.push(i); continue; }
+    /* 宿主不存在（被标成 skip 或被标成孔）→ 这个孔无处可挖。
+       绝不能悄悄把它提升为实体：那等于在孔的位置凭空多出一块料，
+       正是本项目最忌讳的「静默产出错误模型」。改为跳过 + 标记，由界面告警。 */
+    roles[i].orphan = true;
+    roles[i].role = 'skip';
+  }
+  return { roles: roles, groups: groups };
+}
+/* 线段真交叉（端点接触不算），用于桥接的可见性测试 */
+function segsCross(a, b, c, d) {
+  var d1 = polyArea2(c, d, a), d2 = polyArea2(c, d, b);
+  var d3 = polyArea2(a, b, c), d4 = polyArea2(a, b, d);
+  return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+}
+function dist2(a, b) { var dx = b[0] - a[0], dy = b[1] - a[1]; return dx * dx + dy * dy; }
+/* 从点 m 到点 v 的线段是否不穿过任何环边（除两端相邻边外） */
+function bridgeClear(P, m, v, rings) {
+  for (var r = 0; r < rings.length; r++) {
+    var R = rings[r], n = R.length;
+    for (var i = 0; i < n; i++) {
+      var a = R[i], b = R[(i + 1) % n];
+      if (a === m || b === m || a === v || b === v) continue;
+      if (segsCross(P[m], P[v], P[a], P[b])) return false;
+    }
+  }
+  return true;
+}
+/* 孔洞桥接：把孔用一条「双向重合边」缝到宿主环上，得到一条单环序列。
+   取孔上 x 最小的顶点向宿主投射候选（earcut 同款策略），按距离升序取第一个可见顶点。 */
+function bridgeHole(P, hostIdx, holeIdx, rings) {
+  var m = holeIdx[0];
+  for (var i = 1; i < holeIdx.length; i++) {
+    var q = holeIdx[i];
+    if (P[q][0] < P[m][0] || (P[q][0] === P[m][0] && P[q][1] < P[m][1])) m = q;
+  }
+  var cand = [], k;
+  for (k = 0; k < hostIdx.length; k++) if (P[hostIdx[k]][0] <= P[m][0]) cand.push(hostIdx[k]);
+  cand.sort(function (a, b) { return dist2(P[a], P[m]) - dist2(P[b], P[m]); });
+  for (k = 0; k < cand.length; k++) {
+    if (bridgeClear(P, m, cand[k], rings)) return { m: m, p: cand[k], fallback: false };
+  }
+  var all = hostIdx.slice().sort(function (a, b) { return dist2(P[a], P[m]) - dist2(P[b], P[m]); });
+  return { m: m, p: all[0], fallback: true };
+}
+/* 生成桥接后的单环索引序列：host(0..p) + hole(m 起绕一圈) + m + host(p..) */
+function bridgeSequence(hostIdx, holeIdx, bridge) {
+  var pi = -1, mi = -1, i;
+  for (i = 0; i < hostIdx.length; i++) if (hostIdx[i] === bridge.p) { pi = i; break; }
+  for (i = 0; i < holeIdx.length; i++) if (holeIdx[i] === bridge.m) { mi = i; break; }
+  if (pi < 0 || mi < 0) throw new Error('bridgeSequence: 端点不在环内');
+  var out = [];
+  for (i = 0; i <= pi; i++) out.push(hostIdx[i]);
+  for (i = 0; i < holeIdx.length; i++) out.push(holeIdx[(mi + i) % holeIdx.length]);
+  out.push(bridge.m);
+  for (i = pi; i < hostIdx.length; i++) out.push(hostIdx[i]);
+  return out;
+}
+/* 带孔盖面三角化：把 host 与每个孔依次桥接成单环，再喂给 earClip。
+   P 是共享顶点表（host + 各孔各一份），返回的三元组索引直接指向 P ——
+   与侧壁共用同一张顶点表，水密性由构造保证。 */
+function triangulateAnnulus(P, hostIdx, holesIdx) {
+  var seq = hostIdx.slice(), warn = [], i;
+  for (i = 0; i < holesIdx.length; i++) {
+    var rings = [hostIdx].concat(holesIdx);
+    var br = bridgeHole(P, seq, holesIdx[i], rings);
+    if (br.fallback) warn.push('bridge-fallback');
+    seq = bridgeSequence(seq, holesIdx[i], br);
+  }
+  var ec = earClip(P, seq);
+  return { tris: ec.tris, stats: ec.stats, warn: warn, seqLen: seq.length };
+}
+/* 把包围盒极值点按原始索引插回简化环 —— 保证模型尺寸严格等于图纸尺寸。
+   插回的是**被 DP 删掉的原始点**，因此只会让形状更接近原图。 */
+function reinsertExtremes(raw, simp) {
+  var pos = {}, i;
+  for (i = 0; i < raw.length; i++) {
+    var k = raw[i][0] + '|' + raw[i][1];
+    if (pos[k] === undefined) pos[k] = i;
+  }
+  var keep = {}, cnt = 0;
+  for (i = 0; i < simp.length; i++) {
+    var p = pos[simp[i][0] + '|' + simp[i][1]];
+    if (p !== undefined && keep[p] !== 1) { keep[p] = 1; cnt++; }
+  }
+  var ix = 0, iX = 0, iy = 0, iY = 0;
+  for (i = 1; i < raw.length; i++) {
+    if (raw[i][0] < raw[ix][0]) ix = i;
+    if (raw[i][0] > raw[iX][0]) iX = i;
+    if (raw[i][1] < raw[iy][1]) iy = i;
+    if (raw[i][1] > raw[iY][1]) iY = i;
+  }
+  [ix, iX, iy, iY].forEach(function (q) { if (keep[q] !== 1) { keep[q] = 1; cnt++; } });
+  var out = [];
+  for (i = 0; i < raw.length; i++) if (keep[i] === 1) out.push(raw[i]);
+  return out;
+}
+/* 轮廓自交检测（带 bbox 预筛）。自交会直接毁掉耳切 → 必须显式告警。 */
+function countSelfIntersections(P) {
+  var n = P.length, seg = [], i, j;
+  if (n < 4) return { count: 0, samples: [] };
+  for (i = 0; i < n; i++) {
+    var a = P[i], b = P[(i + 1) % n];
+    seg.push({ ax: a[0], ay: a[1], bx: b[0], by: b[1],
+      minx: Math.min(a[0], b[0]), maxx: Math.max(a[0], b[0]),
+      miny: Math.min(a[1], b[1]), maxy: Math.max(a[1], b[1]) });
+  }
+  function cr(ox, oy, ax, ay, bx, by) { return (ax - ox) * (by - oy) - (ay - oy) * (bx - ox); }
+  var hits = 0, samples = [];
+  for (i = 0; i < n; i++) {
+    for (j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue;      /* 相邻边不算 */
+      var s1 = seg[i], s2 = seg[j];
+      if (s1.maxx < s2.minx || s2.maxx < s1.minx || s1.maxy < s2.miny || s2.maxy < s1.miny) continue;
+      var d1 = cr(s2.ax, s2.ay, s2.bx, s2.by, s1.ax, s1.ay);
+      var d2 = cr(s2.ax, s2.ay, s2.bx, s2.by, s1.bx, s1.by);
+      var d3 = cr(s1.ax, s1.ay, s1.bx, s1.by, s2.ax, s2.ay);
+      var d4 = cr(s1.ax, s1.ay, s1.bx, s1.by, s2.bx, s2.by);
+      if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0))) {
+        hits++;
+        if (samples.length < 5) samples.push([i, j]);
+      }
+    }
+  }
+  return { count: hits, samples: samples };
+}
+/* 轮廓嵌套检测：嵌套环（孔洞）当前按「独立实体」处理会填实孔洞 →
+   必须显式告警，不能静默产出错误模型。孔洞归属留到 P3。 */
+function detectNesting(loops) {
+  var pairs = [];
+  for (var i = 0; i < loops.length; i++) {
+    for (var j = 0; j < loops.length; j++) {
+      if (i === j) continue;
+      var pt = loops[i].pts[0];
+      if (pointInRing(pt, loops[j].pts)) pairs.push([i, j]);
+    }
+  }
+  return pairs;
+}
+function pointInRing(p, ring) {
+  var inside = false, n = ring.length;
+  for (var i = 0, j = n - 1; i < n; j = i++) {
+    var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if (((yi > p[1]) !== (yj > p[1])) && (p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+/* ---------- 实体化：双盖 + 侧壁（支持孔洞） ---------- */
+/* loops: [{pts, closed, holes?: [[pt,…],…]}]（已是当前档位点列、必要时已插回极值点）
+   opt:   {height, zBase, centerXY, mirrorX, mirrorY, scale}
+   注意 scale：图纸单位 ≠ 毫米时（cm / inch），XY 必须换算成毫米再挤出 ——
+   STL 本身不带单位，毫米是 3D 打印的事实约定，不换算就会得到一个
+   「数值看着对、实际差一个数量级」的模型。height 已经是毫米，不再换算。
+   顶点表布局：Vp[v] → 3D 索引 2v（底盖）/ 2v+1（顶盖）。盖面与侧壁共用同一张表，
+   水密性由构造保证，而不是事后修补。 */
+function extrudeMesh(loops, opt) {
+  var o = opt || {};
+  var h = (+o.height > 0) ? +o.height : 3;
+  var sc = (+o.scale > 0) ? +o.scale : 1;
+  var z0 = o.zBase === undefined ? 0 : +o.zBase;
+  var z1 = z0 + h;
+  var mx = (o.mirrorX ? -1 : 1) * sc, my = (o.mirrorY ? -1 : 1) * sc;
+  var warn = [], info = [], prep = [], i, j, q;
+  function stripClose(P) {
+    if (P.length > 1 && P[0][0] === P[P.length - 1][0] && P[0][1] === P[P.length - 1][1]) P.pop();
+    return P;
+  }
+  /* 1) 变换 + 去重收尾点；同时算全局包围盒（居中用） */
+  for (i = 0; i < loops.length; i++) {
+    var lp = loops[i], P = [];
+    for (j = 0; j < lp.pts.length; j++) P.push([lp.pts[j][0] * mx, lp.pts[j][1] * my]);
+    stripClose(P);
+    var hs = [];
+    if (lp.holes) {
+      for (q = 0; q < lp.holes.length; q++) {
+        var HP = [];
+        for (j = 0; j < lp.holes[q].length; j++) HP.push([lp.holes[q][j][0] * mx, lp.holes[q][j][1] * my]);
+        stripClose(HP);
+        if (HP.length >= 3) hs.push(HP);
+      }
+    }
+    prep.push({ P: P, holes: hs, closed: !!lp.closed });
+  }
+  var gminX = Infinity, gminY = Infinity, gmaxX = -Infinity, gmaxY = -Infinity;
+  function feed(pts) {
+    for (var z = 0; z < pts.length; z++) {
+      var p = pts[z];
+      if (p[0] < gminX) gminX = p[0];
+      if (p[0] > gmaxX) gmaxX = p[0];
+      if (p[1] < gminY) gminY = p[1];
+      if (p[1] > gmaxY) gmaxY = p[1];
+    }
+  }
+  for (i = 0; i < prep.length; i++) {
+    feed(prep[i].P);
+    for (q = 0; q < prep[i].holes.length; q++) feed(prep[i].holes[q]);
+  }
+  var offX = 0, offY = 0;
+  if (o.centerXY && isFinite(gminX)) { offX = -(gminX + gmaxX) / 2; offY = -(gminY + gmaxY) / 2; }
+
+  /* 2) 建共享二维顶点表 Vp（外轮廓与每个孔各占一段连续区间） */
+  var Vp = [];
+  for (i = 0; i < prep.length; i++) {
+    var it = prep[i];
+    it.bOuter = Vp.length;
+    for (j = 0; j < it.P.length; j++) Vp.push([it.P[j][0] + offX, it.P[j][1] + offY]);
+    it.bHoles = [];
+    for (q = 0; q < it.holes.length; q++) {
+      it.bHoles.push(Vp.length);
+      for (j = 0; j < it.holes[q].length; j++) Vp.push([it.holes[q][j][0] + offX, it.holes[q][j][1] + offY]);
+    }
+  }
+  var verts = [];
+  for (i = 0; i < Vp.length; i++) {
+    verts.push([Vp[i][0], Vp[i][1], z0]);
+    verts.push([Vp[i][0], Vp[i][1], z1]);
+  }
+  var tris = [];
+  function seq(b, n) { var a = [], k; for (k = 0; k < n; k++) a.push(b + k); return a; }
+
+  /* 3) 逐组挤出（一组 = 一个外轮廓 + 它的若干孔洞） */
+  for (i = 0; i < prep.length; i++) {
+    var g = prep[i], nO = g.P.length;
+    if (!g.closed) { warn.push('open'); info.push({ n: nO, holes: 0, skipped: true, reason: 'open' }); continue; }
+    if (nO < 3) { warn.push('few'); info.push({ n: nO, holes: 0, skipped: true, reason: 'few' }); continue; }
+    var outerIdx = seq(g.bOuter, nO), holeIdx = [];
+    for (q = 0; q < g.holes.length; q++) holeIdx.push(seq(g.bHoles[q], g.holes[q].length));
+    /* 定向：实体外轮廓 CCW（侧壁法向朝外）；孔洞 CW（侧壁法向指进孔内 = 背离材料） */
+    if (ringAreaOf(Vp, outerIdx) < 0) outerIdx.reverse();
+    for (q = 0; q < holeIdx.length; q++) if (ringAreaOf(Vp, holeIdx[q]) > 0) holeIdx[q].reverse();
+
+    var cap;
+    if (holeIdx.length) cap = triangulateAnnulus(Vp, outerIdx, holeIdx);
+    else { var ec = earClip(Vp, outerIdx); cap = { tris: ec.tris, stats: ec.stats, warn: [] }; }
+    for (q = 0; q < cap.warn.length; q++) warn.push(cap.warn[q]);
+
+    var t, tt;
+    for (t = 0; t < cap.tris.length; t++) {
+      tt = cap.tris[t];
+      tris.push([tt[0] * 2 + 1, tt[1] * 2 + 1, tt[2] * 2 + 1]);     /* 顶盖 CCW → 法向 +Z */
+      tris.push([tt[2] * 2, tt[1] * 2, tt[0] * 2]);                 /* 底盖反转 → 法向 −Z */
+    }
+    var allRings = [outerIdx].concat(holeIdx);
+    for (q = 0; q < allRings.length; q++) {
+      var R = allRings[q], rn = R.length;
+      for (j = 0; j < rn; j++) {                                    /* 侧壁：外法向 = 行进方向右转 90° */
+        var a = R[j], b = R[(j + 1) % rn];
+        tris.push([a * 2, b * 2, b * 2 + 1]);
+        tris.push([a * 2, b * 2 + 1, a * 2 + 1]);
+      }
+    }
+    var annulus = Math.abs(ringAreaOf(Vp, outerIdx));
+    for (q = 0; q < holeIdx.length; q++) annulus -= Math.abs(ringAreaOf(Vp, holeIdx[q]));
+    info.push({ n: nO, holes: holeIdx.length, capTris: cap.tris.length,
+      minArea: cap.stats.minArea, fallback: cap.stats.fallback, area: annulus, skipped: false });
+  }
+  return { verts: verts, tris: tris, loops: info, warn: warn,
+    z0: z0, z1: z1, height: h, offset: [offX, offY], mirrored: [mx < 0, my < 0] };
+}
+
+/* 顶点表量化到 float32 —— **必须在建三角形之前**做，否则「内存相等的两点」
+   可能因取整路径不同在文件里变成两个点，直接破坏水密性。 */
+function quantizeMesh(mesh) {
+  var n = mesh.verts.length, f = new Float32Array(n * 3);
+  for (var i = 0; i < n; i++) {
+    f[i * 3] = mesh.verts[i][0]; f[i * 3 + 1] = mesh.verts[i][1]; f[i * 3 + 2] = mesh.verts[i][2];
+  }
+  return { verts: f, tris: mesh.tris, loops: mesh.loops, warn: mesh.warn,
+    z0: mesh.z0, z1: mesh.z1, height: mesh.height };
+}
+function meshTriNormal(f, i, j, k) {
+  var ax = f[i * 3], ay = f[i * 3 + 1], az = f[i * 3 + 2];
+  var ux = f[j * 3] - ax, uy = f[j * 3 + 1] - ay, uz = f[j * 3 + 2] - az;
+  var vx = f[k * 3] - ax, vy = f[k * 3 + 1] - ay, vz = f[k * 3 + 2] - az;
+  var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+  var L = Math.sqrt(nx * nx + ny * ny + nz * nz);
+  if (L > 0) { nx /= L; ny /= L; nz /= L; }
+  return [nx, ny, nz, L / 2];
+}
+/* 网格自检（内存层）：每条边恰被 2 面共享 + 欧拉特征数 + 法向朝外 + 退化面。
+   目的：在切片软件报 not watertight / inside-out 之前，本工具先把同一批问题报出来。 */
+function meshReport(bin) {
+  var f = bin.verts, tris = bin.tris;
+  var R = { faceCount: tris.length, vertexCount: 0, edgeCount: 0, boundaryEdges: 0,
+    nonManifoldEdges: 0, euler: 0, volume: 0, absVolume: 0, degenerate: 0,
+    minArea: Infinity, watertight: false, normalsOutward: false,
+    shellCount: 0, shellEuler: [], eulerEven: true };
+  var vmap = {}, edges = {}, vi = 0, t, e;
+  /* 壳体划分（并查集）。**有孔洞之后欧拉特征数不再是常数 2**：贯通孔把实体
+     变成环面，χ = 2 − 2×(贯通孔数)。所以自检必须连同壳体数一起看，
+     否则「两个互相嵌套的独立壳体」这种错误模型会因为 χ = 4（偶数）而蒙混过关。 */
+  var par = {}, triFirst = [];
+  function ufFind(x) {
+    var r = x;
+    while (par[r] !== r) r = par[r];
+    while (par[x] !== r) { var nx = par[x]; par[x] = r; x = nx; }
+    return r;
+  }
+  function ufUni(a, b) { var ra = ufFind(a), rb = ufFind(b); if (ra !== rb) par[ra] = rb; }
+  var minX = Infinity, minY = Infinity, minZ = Infinity;
+  var maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  var keyOf = function (x, y, z) { return x + ',' + y + ',' + z; };
+  for (t = 0; t < tris.length; t++) {
+    var a = tris[t][0], b = tris[t][1], c = tris[t][2];
+    var px = [f[a * 3], f[a * 3 + 1], f[a * 3 + 2]];
+    var py = [f[b * 3], f[b * 3 + 1], f[b * 3 + 2]];
+    var pz = [f[c * 3], f[c * 3 + 1], f[c * 3 + 2]];
+    var ps = [px, py, pz], ks = [], q;
+    for (q = 0; q < 3; q++) {
+      var kk = keyOf(ps[q][0], ps[q][1], ps[q][2]);
+      if (vmap[kk] === undefined) vmap[kk] = vi++;
+      if (par[kk] === undefined) par[kk] = kk;
+      ks.push(kk);
+      if (ps[q][0] < minX) minX = ps[q][0];
+      if (ps[q][0] > maxX) maxX = ps[q][0];
+      if (ps[q][1] < minY) minY = ps[q][1];
+      if (ps[q][1] > maxY) maxY = ps[q][1];
+      if (ps[q][2] < minZ) minZ = ps[q][2];
+      if (ps[q][2] > maxZ) maxZ = ps[q][2];
+    }
+    var nm = meshTriNormal(f, a, b, c);
+    if (nm[3] < R.minArea) R.minArea = nm[3];
+    if (!(nm[3] > 0)) R.degenerate++;
+    R.volume += (px[0] * (py[1] * pz[2] - py[2] * pz[1])
+      - px[1] * (py[0] * pz[2] - py[2] * pz[0])
+      + px[2] * (py[0] * pz[1] - py[1] * pz[0])) / 6;
+    for (e = 0; e < 3; e++) {
+      var k1 = ks[e], k2 = ks[(e + 1) % 3];
+      var ek = k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+      edges[ek] = (edges[ek] || 0) + 1;
+      ufUni(k1, k2);
+    }
+    triFirst.push(ks[0]);
+  }
+  R.vertexCount = vi;
+  var ec = 0, bad1 = 0, bad2 = 0;
+  for (var ek2 in edges) { ec++; if (edges[ek2] === 1) bad1++; else if (edges[ek2] > 2) bad2++; }
+  R.edgeCount = ec; R.boundaryEdges = bad1; R.nonManifoldEdges = bad2;
+  /* 逐壳体统计 V / E / F —— 每个壳体的 χ 都应为偶数且 ≤ 2（χ = 2 − 2×贯通孔数）。
+     这个判据能抓住「外板 + 埋在里面的小实体」那种错误模型（其 χ 合计 = 4 > 2）。 */
+  var sv = {}, se = {}, sf = {}, rk, rv, re, rf, ti;
+  for (rk in vmap) { rv = ufFind(rk); sv[rv] = (sv[rv] || 0) + 1; }
+  for (rk in edges) { re = ufFind(rk.split('|')[0]); se[re] = (se[re] || 0) + 1; }
+  for (ti = 0; ti < triFirst.length; ti++) { rf = ufFind(triFirst[ti]); sf[rf] = (sf[rf] || 0) + 1; }
+  R.shellCount = 0; R.shellEuler = [];
+  for (rk in sv) {
+    R.shellCount++;
+    R.shellEuler.push(sv[rk] - (se[rk] || 0) + (sf[rk] || 0));
+  }
+  R.euler = R.vertexCount - R.edgeCount + R.faceCount;
+  R.eulerEven = (R.euler % 2) === 0;
+  /* 自洽校验：整体 χ 必须等于各壳体 χ 之和 */
+  var sumChi = 0;
+  for (ti = 0; ti < R.shellEuler.length; ti++) sumChi += R.shellEuler[ti];
+  R.eulerConsistent = (sumChi === R.euler);
+  R.watertight = (bad1 === 0 && bad2 === 0);
+  R.normalsOutward = R.volume > 0;
+  R.absVolume = Math.abs(R.volume);
+  R.bbox = { minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ,
+    w: maxX - minX, h: maxY - minY, d: maxZ - minZ };
+  return R;
+}
+
+/* ---------- binary STL 写出 ---------- */
+function stlBinary(bin, opt) {
+  var o = opt || {};
+  var f = bin.verts, tris = bin.tris, n = tris.length;
+  var buf = new ArrayBuffer(84 + 50 * n), dv = new DataView(buf);
+  /* 80 字节文件头是 ASCII 注释。**不写原文件名** → 不泄露客户信息。 */
+  var head = o.header || 'dxf-toolkit binary STL';
+  for (var i = 0; i < 80; i++) dv.setUint8(i, i < head.length ? (head.charCodeAt(i) & 0xFF) : 32);
+  dv.setUint32(80, n, true);
+  var off = 84, flip = !!o.flipNormals;
+  for (var t = 0; t < n; t++) {
+    var a = tris[t][0], b = tris[t][1], c = tris[t][2];
+    /* 「法向翻转」应急开关改的是**绕序**而不是只改动量的法向 ——
+       只写反向法向会与绕序自相矛盾，切片软件按绕序重算时开关就失效了。 */
+    if (flip) { var tmp = b; b = c; c = tmp; }
+    var nm = meshTriNormal(f, a, b, c);
+    dv.setFloat32(off, nm[0], true); dv.setFloat32(off + 4, nm[1], true); dv.setFloat32(off + 8, nm[2], true);
+    off += 12;
+    var ids = [a, b, c];
+    for (var q = 0; q < 3; q++) {
+      var v = ids[q];
+      dv.setFloat32(off, f[v * 3], true);
+      dv.setFloat32(off + 4, f[v * 3 + 1], true);
+      dv.setFloat32(off + 8, f[v * 3 + 2], true);
+      off += 12;
+    }
+    dv.setUint16(off, 0, true); off += 2;
+  }
+  return new Uint8Array(buf);
+}
+function stlAscii(bin, opt) {
+  var o = opt || {};
+  var f = bin.verts, tris = bin.tris;
+  var name = o.name || 'model';                 /* 隐私：默认不带原文件名 */
+  var L = ['solid ' + name];
+  for (var t = 0; t < tris.length; t++) {
+    var a = tris[t][0], b = tris[t][1], c = tris[t][2];
+    var ids = [a, b, c];
+    if (o.flipNormals) ids = [a, c, b];
+    var nm = meshTriNormal(f, ids[0], ids[1], ids[2]);
+    L.push('  facet normal ' + nm[0].toExponential(6) + ' ' + nm[1].toExponential(6) + ' ' + nm[2].toExponential(6));
+    L.push('    outer loop');
+    for (var q = 0; q < 3; q++) {
+      var v = ids[q];
+      L.push('      vertex ' + f[v * 3].toFixed(6) + ' ' + f[v * 3 + 1].toFixed(6) + ' ' + f[v * 3 + 2].toFixed(6));
+    }
+    L.push('    endloop');
+    L.push('  endfacet');
+  }
+  L.push('endsolid ' + name);
+  return L.join('\n') + '\n';
+}
+/* ---------- STL 字节层读回校验 ----------
+   独立于内存网格的第二条路径：只吃导出后的字节。它能抓到「内存里对、
+   写进文件后错」这一类只在交付物上暴露的缺陷。
+   顶点标识用 float32 的**位模式**：水密性的定义是「逐位相同」，
+   用字符串四舍五入做近似比较会放过真实裂缝。 */
+function stlReadBack(bytes) {
+  var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  var R = { faceCount: 0, byteLength: bytes.length, sizeOk: false, headerU32: 0,
+    boundaryEdges: 0, nonManifoldEdges: 0, vertexCount: 0, edgeCount: 0,
+    euler: 0, volume: 0, degenerate: 0, minArea: Infinity, watertight: false,
+    normalsOutward: false, bbox: null, unitNormalOk: true };
+  if (bytes.length < 84) return R;
+  var n = dv.getUint32(80, true);
+  R.faceCount = n; R.headerU32 = n;
+  R.sizeOk = (bytes.length === 84 + 50 * n);
+  if (!R.sizeOk) return R;
+  var vmap = {}, edges = {}, vi = 0, t;
+  var minX = Infinity, minY = Infinity, minZ = Infinity;
+  var maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (t = 0; t < n; t++) {
+    var off = 84 + t * 50;
+    var nlen = Math.sqrt(dv.getFloat32(off, true) * dv.getFloat32(off, true)
+      + dv.getFloat32(off + 4, true) * dv.getFloat32(off + 4, true)
+      + dv.getFloat32(off + 8, true) * dv.getFloat32(off + 8, true));
+    if (Math.abs(nlen - 1) > 1e-4) R.unitNormalOk = false;
+    off += 12;
+    var ks = [], ps = [];
+    for (var q = 0; q < 3; q++) {
+      var x = dv.getFloat32(off, true), y = dv.getFloat32(off + 4, true), z = dv.getFloat32(off + 8, true);
+      var bk = dv.getUint32(off, true) + ':' + dv.getUint32(off + 4, true) + ':' + dv.getUint32(off + 8, true);
+      off += 12;
+      ps.push([x, y, z]);
+      ks.push(bk);
+      if (vmap[bk] === undefined) vmap[bk] = vi++;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
+    var pa = ps[0], pb = ps[1], pc = ps[2];
+    var ux = pb[0] - pa[0], uy = pb[1] - pa[1], uz = pb[2] - pa[2];
+    var vx = pc[0] - pa[0], vy = pc[1] - pa[1], vz = pc[2] - pa[2];
+    var cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx;
+    var area = Math.sqrt(cx * cx + cy * cy + cz * cz) / 2;
+    if (area < R.minArea) R.minArea = area;
+    if (!(area > 0)) R.degenerate++;
+    R.volume += (pa[0] * (pb[1] * pc[2] - pb[2] * pc[1])
+      - pa[1] * (pb[0] * pc[2] - pb[2] * pc[0])
+      + pa[2] * (pb[0] * pc[1] - pb[1] * pc[0])) / 6;
+    for (var e = 0; e < 3; e++) {
+      var k1 = ks[e], k2 = ks[(e + 1) % 3];
+      var ek = k1 < k2 ? k1 + '|' + k2 : k2 + '|' + k1;
+      edges[ek] = (edges[ek] || 0) + 1;
+    }
+  }
+  R.vertexCount = vi;
+  var ec = 0, bad1 = 0, bad2 = 0;
+  for (var ek2 in edges) { ec++; if (edges[ek2] === 1) bad1++; else if (edges[ek2] > 2) bad2++; }
+  R.edgeCount = ec; R.boundaryEdges = bad1; R.nonManifoldEdges = bad2;
+  R.euler = R.vertexCount - R.edgeCount + R.faceCount;
+  R.watertight = (bad1 === 0 && bad2 === 0);
+  R.normalsOutward = R.volume > 0;
+  R.absVolume = Math.abs(R.volume);
+  R.bbox = { minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ,
+    w: maxX - minX, h: maxY - minY, d: maxZ - minZ };
+  return R;
+}
+
+/* ---------- 三维视图的纯数学：相机基向量 / 网格包围盒 / 光栅化 ----------
+   刻意放在 CORE 区：这些函数只依赖传入的 ctx，不碰 DOM，因此可以在 node 里
+   用一个记录调用的 mock 2D 上下文完整验证背面剔除、深度排序、投影自适应与
+   明暗计算 —— 把「三维预览」从不可测的浏览器人工项，变成可离线回归的部分。 */
+/* 相机基向量：世界 Z 轴向上，用方位角 az / 俯仰角 ex 定位相机 */
+function camBasis(az, ex) {
+  var a = az * Math.PI / 180, e = Math.max(-89, Math.min(89, ex)) * Math.PI / 180;
+  var ce = Math.cos(e);
+  var d = [ce * Math.sin(a), -ce * Math.cos(a), Math.sin(e)];       /* 物 → 相机 */
+  var r = norm3([-d[1], d[0], 0]);                                  /* 右向量 */
+  var u = norm3(cross3(d, r));                                      /* 上向量 */
+  return { d: d, r: r, u: u };
+}
+function cross3(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+}
+function norm3(v) {
+  var L = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+  return L > 0 ? [v[0] / L, v[1] / L, v[2] / L] : [0, 0, 1];
+}
+function meshBounds(mesh) {
+  if (mesh._bb) return mesh._bb;
+  var f = mesh.verts;
+  var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (var i = 0; i < f.length; i += 3) {
+    for (var c = 0; c < 3; c++) {
+      var v = f[i + c];
+      if (v < mn[c]) mn[c] = v;
+      if (v > mx[c]) mx[c] = v;
+    }
+  }
+  if (!isFinite(mn[0])) { mn = [0, 0, 0]; mx = [0, 0, 0]; }
+  var w = mx[0] - mn[0], h = mx[1] - mn[1], d = mx[2] - mn[2];
+  mesh._bb = {
+    mn: mn, mx: mx, w: w, h: h, d: d,
+    c: [(mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2],
+    r: Math.max(1e-6, 0.5 * Math.sqrt(w * w + h * h + d * d))
+  };
+  return mesh._bb;
+}
+function meshFaceNormals(mesh) {
+  if (mesh._fn) return mesh._fn;
+  var f = mesh.verts, tris = mesh.tris, n = tris.length;
+  var out = new Float32Array(n * 3);
+  for (var i = 0; i < n; i++) {
+    var nm = meshTriNormal(f, tris[i][0], tris[i][1], tris[i][2]);
+    out[i * 3] = nm[0]; out[i * 3 + 1] = nm[1]; out[i * 3 + 2] = nm[2];
+  }
+  mesh._fn = out;
+  return out;
+}
+/* 把网格画到任意 2D 上下文 —— 屏幕预览与 PNG 导出共用同一段代码，
+   保证「看到的」与「导出的」是同一个渲染结果。 */
+function drawModelTo(ctx, W, H, mesh, cam, dark, fitScale) {
+  var bb = meshBounds(mesh), B = camBasis(cam.az, cam.ex);
+  var scale = (fitScale > 0) ? fitScale : Math.min(W, H) * 0.46 / bb.r * (cam.zoom || 1);
+  var cx = W / 2 + (cam.panX || 0), cy = H / 2 + (cam.panY || 0);
+  /* 背景 */
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = dark ? '#15181c' : '#f7f8fa';
+  ctx.fillRect(0, 0, W, H);
+
+  var f = mesh.verts, tris = mesh.tris, fn = meshFaceNormals(mesh);
+  var nf = (f.length / 3) | 0;
+  var sx = new Float32Array(nf), sy = new Float32Array(nf), sz = new Float32Array(nf);
+  var i, c3 = bb.c, d = B.d, r = B.r, u = B.u;
+  for (i = 0; i < nf; i++) {
+    var vx = f[i * 3] - c3[0], vy = f[i * 3 + 1] - c3[1], vz = f[i * 3 + 2] - c3[2];
+    sx[i] = vx * r[0] + vy * r[1] + vz * r[2];
+    sy[i] = vx * u[0] + vy * u[1] + vz * u[2];
+    sz[i] = vx * d[0] + vy * d[1] + vz * d[2];
+  }
+  /* 视角空间光照：光从左上前方打来（跟随相机，避免转到背面全黑） */
+  var Lv = norm3([-0.35, 0.55, 0.75]);
+  var base = dark ? [0.44, 0.60, 0.88] : [0.38, 0.55, 0.85];
+  var list = [];
+  for (i = 0; i < tris.length; i++) {
+    var a = tris[i][0], b = tris[i][1], cc = tris[i][2];
+    /* 视角空间法向：旋转是正交变换，用变换后的点直接叉乘即可 */
+    var e1x = sx[b] - sx[a], e1y = sy[b] - sy[a], e1z = sz[b] - sz[a];
+    var e2x = sx[cc] - sx[a], e2y = sy[cc] - sy[a], e2z = sz[cc] - sz[a];
+    var nx = e1y * e2z - e1z * e2y, ny = e1z * e2x - e1x * e2z, nz = e1x * e2y - e1y * e2x;
+    if (!(nz > 0)) continue;                       /* 背面剔除（闭合实体可靠） */
+    var nl = Math.sqrt(nx * nx + ny * ny + nz * nz);
+    if (!(nl > 0)) continue;
+    nx /= nl; ny /= nl; nz /= nl;
+    var lam = nx * Lv[0] + ny * Lv[1] + nz * Lv[2];
+    if (lam < 0) lam = 0;
+    var it = 0.30 + 0.70 * lam;
+    list.push({
+      a: a, b: b, c: cc, z: (sz[a] + sz[b] + sz[cc]) / 3,
+      col: 'rgb(' + Math.round(base[0] * it * 255) + ',' + Math.round(base[1] * it * 255)
+        + ',' + Math.round(base[2] * it * 255) + ')'
+    });
+  }
+  list.sort(function (p, q) { return p.z - q.z; });   /* 远的先画 */
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1;
+  for (i = 0; i < list.length; i++) {
+    var t = list[i];
+    var x1 = cx + sx[t.a] * scale, y1 = cy - sy[t.a] * scale;
+    var x2 = cx + sx[t.b] * scale, y2 = cy - sy[t.b] * scale;
+    var x3 = cx + sx[t.c] * scale, y3 = cy - sy[t.c] * scale;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath();
+    /* 描边与填充同色：消除相邻三角形之间的发丝裂缝 */
+    ctx.fillStyle = t.col; ctx.strokeStyle = t.col;
+    ctx.fill(); ctx.stroke();
+  }
+  return { faces: tris.length, drawn: list.length, radius: bb.r, scale: scale };
+}
+/*==CORE_END==*/
+
+/* ============================================================================
+ *  UI 层
+ * ==========================================================================*/
+(function () {
+'use strict';
+var $ = function (s) { return document.querySelector(s); };
+var $$ = function (s) { return Array.prototype.slice.call(document.querySelectorAll(s)); };
+/* 统一的显隐开关 —— **必须用特性（attribute）而不是元素属性（property）**。
+ * 坑：`hidden` 只定义在 HTMLElement 上（实测 SVGElement.prototype 上没有该描述符）。
+ * 对 <svg> 写 `el.hidden = false` 只会创建一个 JS 影子属性，`hidden` 特性仍在，
+ * CSS 的 `[hidden]{display:none}` 继续生效 → 二维预览看起来"失效"了，
+ * 而测试若断言 el.hidden 反而会误判为通过。所以一律走 setAttribute/removeAttribute。 */
+function setHidden(el, on) {
+  if (!el) return;
+  if (on) el.setAttribute('hidden', ''); else el.removeAttribute('hidden');
+}
+function isHidden(el) { return !!(el && el.hasAttribute('hidden')); }
+
+/* ---------------- i18n ---------------- */
+var I18N = {
+  zh: {
+    'app.title': 'DXF 三维数模工具',
+    'app.sub': '链化 → 实体化 → STL · 全程本地计算',
+    'mode.simple': '简易', 'mode.pro': '专业',
+    'lang.zh': '中文', 'lang.en': 'EN',
+    'btn.help': '帮助', 'btn.clear': '清空', 'btn.convertAll': '生成数模', 'btn.export': '导出',
+    'btn.fit': '适应窗口', 'btn.close': '关闭', 'btn.open': '选择文件', 'btn.openDir': '选择文件夹',
+    'btn.spin': '自动旋转',
+    'queue.title': '文件队列', 'queue.drop': '拖入 DXF 文件或文件夹', 'queue.dropSub': '或点击此处选择文件（.dxf）',
+    'queue.remove': '从队列移除',
+    'queue.hint': '提示：可直接把整个文件夹拖进来。所有解析、链化、挤出成模与导出均在本机浏览器内完成，不会向任何服务器发送数据。',
+    'stage.view.model': '三维数模', 'stage.view.contour': '轮廓',
+    'stage.placeholder': '拖入 DXF 后自动链化并生成三维数模',
+    'params.title': '参数',
+    'params.tier': '网格精度档位', 'params.ratio': '顶点保留比例', 'params.unit': '图纸单位',
+    'params.eps': '吸附容差', 'params.curveTol': '曲线离散精度', 'params.strokeWidth': '线宽',
+    'params.strokeColor': '线条颜色', 'params.keepOffset': '保留原始坐标偏移', 'params.singlePath': '合并为单条 path',
+    'params.height': '挤出高度', 'params.fidelity': '尺寸保真（插回极值点）',
+    'params.place': '放置方式', 'params.stlFormat': 'STL 格式', 'params.flipNormals': '翻转法向（应急）',
+    'params.mirrorX': '镜像 X', 'params.mirrorY': '镜像 Y', 'params.selfCheck': '导出前水密自检',
+    'tier.lossless': '无损', 'tier.high': '高精度', 'tier.medium': '中精度', 'tier.minimal': '极简',
+    'unit.mm': '毫米 mm', 'unit.cm': '厘米 cm', 'unit.inch': '英寸 inch',
+    'place.center': 'XY 居中 · Z 从 0 起', 'place.origin': '保留图纸原坐标',
+    'stl.binary': 'binary（体积小）', 'stl.ascii': 'ascii（可读）',
+    'hint.ratio': '按顶点数压缩；同时决定网格面数与 STL 体积',
+    'hint.eps': '判定两端点为同一点的阈值；0 = 严格相等',
+    'hint.curveTol': '圆弧/样条离散的弦高误差（mm）',
+    'hint.strokeWidth': '仅影响 SVG 附带输出',
+    'hint.unit': '1 图纸单位换算为多少毫米',
+    'hint.height': '沿 Z 轴挤出的厚度',
+    'hint.fidelity': '把图纸极值点插回，使模型尺寸严格等于图纸尺寸',
+    'hint.place': '切片软件的放置习惯',
+    'hint.stlFormat': 'binary 兼容性最好；ascii 便于人工核对',
+    'hint.flipNormals': '仅当模型在切片软件里显示内外翻转时使用',
+    'hint.mirrorX': '客户图纸方向反了时，比让他改图快',
+    'hint.mirrorY': '同上',
+    'hint.selfCheck': '导出前校验水密性 / 法向 / 壳体与欧拉特征数',
+    'params.nestMode': '嵌套轮廓（孔洞）',
+    'hint.nestMode': '自动按嵌套深度判定；「全部填实」为旧行为',
+    'nest.auto': '自动（按嵌套深度）', 'nest.fill': '全部填实（旧行为）',
+    'role.auto': '自动', 'role.solid': '实体', 'role.hole': '孔洞', 'role.skip': '忽略',
+    'rings.title': '闭合轮廓', 'rings.none': '本图没有闭合轮廓',
+    'rings.depth': '深', 'rings.area': '面积', 'rings.locate': '定位',
+    'rings.autoIs': '自动判定为', 'rings.reset': '全部恢复自动',
+    'rings.cleared': '几何参数已变更，手动轮廓设定已重置',
+    'rings.simpleTip': '检测到嵌套轮廓，已自动按孔洞挖空。需要逐个指定请切到专业模式。',
+    'diag.rings': '轮廓角色',
+    'diag.rings': '轮廓角色', 'diag.shells': '实体数',
+    'warn.nestedHandled': '已自动挖空 {n} 处嵌套轮廓（孔洞）。',
+    'warn.nestedFilled': '按「全部填实」处理了 {n} 处嵌套轮廓——孔洞不会挖空，请确认这是你要的结果。',
+    'warn.orientMismatch': '{n} 个轮廓的绕向与嵌套深度判定不一致，建议核对「轮廓角色」。',
+    'warn.shells': '模型含 {n} 个互不相连的实体。',
+    'stats.size': '图纸尺寸', 'stats.model': '模型尺寸', 'stats.vertices': '顶点', 'stats.deviation': '最大偏差',
+    'stats.chains': '轮廓', 'stats.faces': '三角面', 'stats.watertight': '水密',
+    'stats.empty': '尚未载入文件',
+    'diag.title': '诊断', 'diag.clean': '无异常',
+    'diag.gaps': '断口', 'diag.branch': '分支点', 'diag.unsupported': '未支持实体',
+    'diag.open': '开口链', 'diag.dupes': '重复线段', 'diag.snapped': '已吸附', 'diag.approx': '含近似几何',
+    'diag.selfintersect': '轮廓自交', 'diag.nesting': '嵌套轮廓（孔洞）', 'diag.degenerate': '退化面',
+    'diag.euler': '欧拉特征数', 'diag.detail': '诊断详情',
+    'warn.browser': '当前浏览器不支持「直写输出目录」，导出时将自动降级为 ZIP 下载。推荐使用 Chrome / Edge 以获得最佳体验。',
+    'warn.large': '文件超过 50 MB，已拒绝载入（避免浏览器内存溢出）。',
+    'warn.unsupported': '本图含 {n} 个未参与转换的实体（{list}），这些内容不会出现在输出中。',
+    'warn.noFile': '请先拖入至少一个 DXF 文件。',
+    'warn.noExport': '请至少勾选一种导出格式。',
+    'warn.failed': '生成数模失败：{msg}',
+    'warn.openChain': '本图含 {n} 条开口链。开口轮廓无法挤出成实体，已跳过；这些内容不会出现在三维数模中。',
+    'warn.nested': '检测到 {n} 处嵌套轮廓（孔洞）——已按「全部填实」处理，孔洞不会挖空。',
+    'warn.selfIntersect': '检测到 {n} 处轮廓自交，模型可能不正确，请检查图纸。',
+    'warn.notWatertight': '自检未通过：模型不是水密实体，切片软件可能报错。',
+    'exp.stl': '三维数模 STL', 'exp.svg': 'SVG（附带）', 'exp.png': 'PNG 预览',
+    'exp.name': '文件名', 'exp.namePh': '默认：原文件名',
+    'exp.nameHint': '留空 = 沿用原文件名；可用 {name} 表示原文件名、{n} 表示序号。多个文件共用同一名称时会自动补序号。',
+    'exp.tip': '将导出：{list}',
+    'exp.tipMore': '将导出：{list} 等 {n} 个文件',
+    'exp.cleaned': '文件名中的非法字符已自动去掉',
+    'exp.tokens': '占位符：{name} 原文件名 · {n} 序号',
+    'exp.dirTip': '导出方式：直写目录（Chrome / Edge）', 'exp.zipTip': '导出方式：ZIP 打包下载',
+    'msg.processing': '处理中…', 'msg.exported': '已导出 {n} 个文件',
+    'msg.removed': '已从队列移除 {name}',
+    'msg.zipDone': 'ZIP 已生成，共 {n} 个文件', 'msg.dirDone': '已写入所选目录，共 {n} 个文件',
+    'msg.nothing': '没有可导出的结果，请先点「生成数模」',
+    'msg.noCanvas': '当前环境不支持二维画布，PNG 预览已跳过。',
+    'status.done': '已完成', 'status.stale': '参数已变更，需重新生成', 'status.err': '失败',
+    'status.stl': '三维数模', 'status.watertightOk': '水密 ✓', 'status.watertightBad': '非水密 ✗',
+    'help.title': '使用说明',
+    'help.intro': '把由大量独立直线段构成的 DXF 图纸，链化为连续轮廓，再沿 Z 轴挤出成可 3D 打印的实体数模（STL）。全程在浏览器本地计算，图纸不上传。',
+    'help.s1t': '三步上手',
+    'help.s1': '<b>1 拖入</b>：把 DXF 文件（或整个文件夹）拖到左侧队列。队列中每个文件右侧的 <b>×</b> 可单独移除该文件，不影响其余文件。<br><b>2 选档</b>：在右侧选择网格精度档位——无损 / 高精度 / 中精度 / 极简。档位同时决定三维模型的面数与 STL 文件大小。<br><b>3 导出</b>：点「生成数模」，再点「导出」。<br><b>提示</b>：在右侧改动任何参数，当前图纸会<b>立即自动重算并原位刷新预览</b>，不需要重新点「生成数模」。中间的三维预览可以<b>拖动旋转</b>、<b>滚轮缩放</b>。',
+    'help.s2t': '四档精度与三角面数',
+    'help.s2': '档位按「保留的顶点比例」划分：<b>无损 100%</b>（直接输出原始顶点，不做任何简化）、<b>高精度 30%</b>、<b>中精度 10%</b>、<b>极简 3%</b>。简化使用 Douglas-Peucker 算法并对容差做二分搜索，精确命中目标顶点数。<br>挤出后的三角面数 = <b>(轮廓顶点数 − 2) × 2（上下两个盖面）+ 轮廓顶点数 × 2（侧壁）</b>。以本工具自带的样例图纸为例：无损档 7352 面 / 约 368 KB，极简档 232 面 / 约 12 KB。所以<b>档位对 STL 的影响比对手绘 SVG 大得多</b>——面数直接决定切片速度与文件体积。',
+    'help.s3t': '三维数模参数（专业模式）',
+    'help.s3': '<b>挤出高度</b>：沿 Z 轴挤出的厚度（mm）。<br><b>尺寸保真</b>：简化只删顶点不增顶点，会把图纸的极值点一起删掉，导致模型比图纸略小（实测极简档小 0.199 / 0.180 mm）。开启后会把极值点按原始位置插回轮廓，使<b>四档模型尺寸严格等于图纸尺寸</b>，代价仅增加 3~4 个顶点。<b>建议保持开启。</b><br><b>放置方式</b>：默认「XY 居中 · Z 从 0 起」，贴合切片软件习惯；也可保留图纸原始坐标。<br><b>镜像 X / Y</b>：客户图纸方向反了时，比让他改图更快。<br><b>STL 格式</b>：binary 体积小、兼容性最好；ascii 便于人工核对。<br><b>导出前水密自检</b>：校验每条边是否恰被 2 个三角形共享、欧拉特征数是否为 2、法向是否朝外。<br><b>翻转法向</b>：应急开关，仅在切片软件把模型显示成内外翻转时使用。',
+    'help.s4t': '几何参数（专业模式）',
+    'help.s4': '<b>吸附容差</b>：判定两个端点是否为同一点的阈值。默认 0 表示要求端点严格相等；当图纸存在细微缝隙（断口）时，可调大该值让断口自动接上。<br><b>曲线离散精度</b>：圆弧、圆、椭圆、样条的离散弦高误差，越小越圆滑、模型越精细。<br><b>图纸单位</b>：1 图纸单位换算为多少毫米。<br>SVG 相关参数（线宽、颜色、保留坐标偏移、合并单条 path）只影响<b>附带的 SVG 导出</b>，不影响三维数模。',
+    'help.faq1q': '为什么模型尺寸和图纸有一丝差别？',
+    'help.faq1a': 'STL 的坐标是 32 位浮点数，在 300 mm 量级上的分辨率约 3×10⁻⁵ mm（30 纳米）——这是 STL 格式本身的精度上限，对 3D 打印没有任何影响。除此之外，只要「尺寸保真」保持开启，模型包围盒尺寸与图纸尺寸在数值上一致。',
+    'help.faq2q': '为什么输出里少了文字/填充/标注？',
+    'help.faq2a': '本工具只转换几何轮廓（直线、多段线、圆弧、圆、椭圆、样条、块引用）。文字、图案填充、尺寸标注等不参与转换，且不会静默跳过——顶部会明确列出被忽略的实体类型与数量。',
+    'help.faq3q': '开口轮廓与孔洞怎么处理？',
+    'help.faq3a': '挤出实体要求轮廓闭合。开口链无法成实体，会被明确告警并跳过（绝不静默产出错误模型）。若图纸有细微缝隙，调大「吸附容差」让端点吸附成环即可。嵌套轮廓（孔洞）默认<b>按嵌套深度自动判定角色</b>并挖空：最外层为实体，其内一层为孔洞，再内一层为孔中之岛，如此交替；孔洞没有对应宿主时会告警并跳过，绝不悄悄补成实体。若需回退旧行为，可在专业模式把「嵌套轮廓」改为「全部填实」。方向（外轮廓逆时针、孔洞顺时针）会与深度判定交叉校验，不一致时告警。',
+    'help.faq4q': '支持批量吗？',
+    'help.faq4a': '支持。拖入多个文件或整个文件夹后点「生成数模」，再点「导出」。若使用 Chrome / Edge，可直接选择一个输出目录并逐个写入；其他浏览器会自动打包成 ZIP 下载。批量导出 STL 时会逐个生成，文件较大时请耐心等待。',
+    'help.faq5q': '怎么确认模型真的能打印？',
+    'help.faq5a': '本工具在导出前会做水密自检：每条边恰好被 2 个三角形共享（无边界边、无非流形边）、欧拉特征数 V−E+F = 2、signed volume > 0（法向朝外）。这四项对应切片软件最常报的 <b>not watertight</b> 与 <b>inside-out</b>。诊断栏会显示自检结果；把导出的 STL 拖进切片软件后，还应确认尺寸与图纸一致、无修复提示。',
+    'help.privacyT': '保密性说明',
+    'help.privacy': '本页面的安全策略中写死了 <code>connect-src \'none\'</code>，从浏览器层面禁止任何网络外发（fetch / XHR / WebSocket / sendBeacon 全部被拒）。图纸只存在于你的浏览器内存中，链化与挤出都不产生任何网络请求，服务器也从不接触你的图纸。导出的 STL 文件头里<b>不写入原文件名</b>，避免随文件泄露客户信息。你可以把本文件另存到本地、拔掉网线后继续使用。',
+    'term.title': '术语表（中 / EN）',
+    'term.chain': '链化', 'term.lossless': '无损', 'term.ratio': '顶点数压缩比', 'term.dev': '最大偏差',
+    'term.gap': '断口', 'term.eps': '吸附容差', 'term.branch': '分支点', 'term.open': '开口链',
+    'term.physical': '物理尺寸',
+    'term.extrude': '挤出', 'term.mesh': '网格', 'term.facet': '三角面', 'term.watertight': '水密',
+    'term.normal': '法向', 'term.earcut': '耳切三角化', 'term.stl': 'STL 实体数模', 'term.manifold': '流形'
+  },
+  en: {
+    'app.title': 'DXF → 3D Model (STL)',
+    'app.sub': 'Chain → extrude → STL · runs entirely on your machine',
+    'mode.simple': 'Simple', 'mode.pro': 'Pro',
+    'lang.zh': '中文', 'lang.en': 'EN',
+    'btn.help': 'Help', 'btn.clear': 'Clear', 'btn.convertAll': 'Build model', 'btn.export': 'Export',
+    'btn.fit': 'Fit', 'btn.close': 'Close', 'btn.open': 'Choose files', 'btn.openDir': 'Choose folder',
+    'btn.spin': 'Auto-rotate',
+    'queue.title': 'Files', 'queue.drop': 'Drop DXF files or a folder here', 'queue.dropSub': 'or click to choose files (.dxf)',
+    'queue.remove': 'Remove from queue',
+    'queue.hint': 'Tip: you can drop a whole folder. Parsing, chaining, extrusion and export all run inside this browser tab — no data is ever sent to a server.',
+    'stage.view.model': '3D model', 'stage.view.contour': 'Contour',
+    'stage.placeholder': 'Drop a DXF file to chain the segments and build a 3D model',
+    'params.title': 'Parameters',
+    'params.tier': 'Mesh detail level', 'params.ratio': 'Vertex ratio', 'params.unit': 'Drawing unit',
+    'params.eps': 'Snap tolerance', 'params.curveTol': 'Curve flattening', 'params.strokeWidth': 'Stroke width',
+    'params.strokeColor': 'Stroke color', 'params.keepOffset': 'Keep original offset', 'params.singlePath': 'Merge into one path',
+    'params.height': 'Extrusion height', 'params.fidelity': 'Exact-size (re-insert extremes)',
+    'params.place': 'Placement', 'params.stlFormat': 'STL format', 'params.flipNormals': 'Flip normals (rescue)',
+    'params.mirrorX': 'Mirror X', 'params.mirrorY': 'Mirror Y', 'params.selfCheck': 'Watertight self-check',
+    'tier.lossless': 'Lossless', 'tier.high': 'High', 'tier.medium': 'Medium', 'tier.minimal': 'Minimal',
+    'unit.mm': 'Millimeter mm', 'unit.cm': 'Centimeter cm', 'unit.inch': 'Inch',
+    'place.center': 'XY centered · Z from 0', 'place.origin': 'Keep drawing coordinates',
+    'stl.binary': 'binary (smaller)', 'stl.ascii': 'ascii (human-readable)',
+    'hint.ratio': 'Vertex compression; also drives facet count and STL size',
+    'hint.eps': 'Threshold for treating two endpoints as one; 0 = exact',
+    'hint.curveTol': 'Chord height error for arcs/splines (mm)',
+    'hint.strokeWidth': 'Affects the attached SVG only',
+    'hint.unit': 'How many millimeters one drawing unit equals',
+    'hint.height': 'Thickness extruded along Z',
+    'hint.fidelity': 'Re-insert drawing extremes so the model size matches the drawing exactly',
+    'hint.place': 'Matches the habit of slicer software',
+    'hint.stlFormat': 'binary has the best compatibility; ascii is easier to inspect',
+    'hint.flipNormals': 'Use only if a slicer shows the model inside-out',
+    'hint.mirrorX': 'Faster than asking the customer to fix a mirrored drawing',
+    'hint.mirrorY': 'Same as above',
+    'hint.selfCheck': 'Verify watertightness, normals, shell count and Euler characteristic before export',
+    'params.nestMode': 'Nested contours (holes)',
+    'hint.nestMode': 'Auto by nesting depth; “Fill everything” is the legacy behaviour',
+    'nest.auto': 'Auto (by nesting depth)', 'nest.fill': 'Fill everything (legacy)',
+    'role.auto': 'Auto', 'role.solid': 'Solid', 'role.hole': 'Hole', 'role.skip': 'Ignore',
+    'rings.title': 'Closed contours', 'rings.none': 'No closed contours in this drawing',
+    'rings.depth': 'depth', 'rings.area': 'area', 'rings.locate': 'Locate',
+    'rings.autoIs': 'auto', 'rings.reset': 'Reset all to auto',
+    'rings.cleared': 'Geometry parameters changed; manual contour settings were reset',
+    'rings.simpleTip': 'Nested contours detected and cut out automatically. Switch to Pro mode to assign each ring manually.',
+    'diag.rings': 'Contour roles', 'diag.shells': 'Solids',
+    'warn.nestedHandled': 'Cut out {n} nested contour(s) as holes automatically.',
+    'warn.nestedFilled': '{n} nested contour(s) were filled instead of cut out — please confirm that is what you want.',
+    'warn.orientMismatch': '{n} contour(s) have a winding that disagrees with the nesting-depth rule; please review the contour roles.',
+    'warn.shells': 'The model contains {n} separate solids.',
+    'stats.size': 'Drawing size', 'stats.model': 'Model size', 'stats.vertices': 'Vertices',
+    'stats.deviation': 'Max deviation', 'stats.chains': 'Contours', 'stats.faces': 'Facets',
+    'stats.watertight': 'Watertight',
+    'stats.empty': 'No file loaded',
+    'diag.title': 'Diagnostics', 'diag.clean': 'All clear',
+    'diag.gaps': 'Gaps', 'diag.branch': 'Branch points', 'diag.unsupported': 'Unsupported entities',
+    'diag.open': 'Open chains', 'diag.dupes': 'Duplicate segments', 'diag.snapped': 'Snapped', 'diag.approx': 'Approximated geometry',
+    'diag.selfintersect': 'Self-intersections', 'diag.nesting': 'Nested contours (holes)', 'diag.degenerate': 'Degenerate facets',
+    'diag.euler': 'Euler characteristic', 'diag.detail': 'Diagnostic details',
+    'warn.browser': 'This browser cannot write directly to a folder, so export falls back to a ZIP download. Chrome or Edge is recommended for the best experience.',
+    'warn.large': 'File exceeds 50 MB and was rejected to avoid running the browser out of memory.',
+    'warn.unsupported': 'This drawing contains {n} entities that are not converted ({list}); they will not appear in the output.',
+    'warn.noFile': 'Drop at least one DXF file first.',
+    'warn.noExport': 'Select at least one export format.',
+    'warn.failed': 'Model build failed: {msg}',
+    'warn.openChain': 'This drawing has {n} open chain(s). Open contours cannot be extruded into a solid, so they were skipped — they are not part of the 3D model.',
+    'warn.nested': 'Detected {n} nested contour(s) (holes) — filled instead of cut out because “Fill everything” is selected.',
+    'warn.selfIntersect': 'Detected {n} self-intersection(s); the model may be incorrect. Please check the drawing.',
+    'warn.notWatertight': 'Self-check failed: the model is not a watertight solid and a slicer may reject it.',
+    'exp.stl': '3D model STL', 'exp.svg': 'SVG (attached)', 'exp.png': 'PNG preview',
+    'exp.name': 'File name', 'exp.namePh': 'Default: source file name',
+    'exp.nameHint': 'Leave empty to keep the source name; use {name} for the source name and {n} for an index. A shared name is suffixed with an index automatically when exporting several files.',
+    'exp.tip': 'Will export: {list}',
+    'exp.tipMore': 'Will export: {list} and {n} file(s) in total',
+    'exp.cleaned': 'Illegal characters were removed from the file name',
+    'exp.tokens': 'Tokens: {name} source name · {n} index',
+    'exp.dirTip': 'Export mode: write directly to folder (Chrome / Edge)', 'exp.zipTip': 'Export mode: ZIP download',
+    'msg.processing': 'Processing…', 'msg.exported': 'Exported {n} file(s)',
+    'msg.removed': 'Removed {name} from the queue',
+    'msg.zipDone': 'ZIP created with {n} file(s)', 'msg.dirDone': 'Wrote {n} file(s) to the chosen folder',
+    'msg.nothing': 'Nothing to export — click "Build model" first',
+    'msg.noCanvas': 'This environment has no 2D canvas support, so the PNG preview was skipped.',
+    'status.done': 'Done', 'status.stale': 'Parameters changed — rebuild', 'status.err': 'Failed',
+    'status.stl': '3D model', 'status.watertightOk': 'watertight ✓', 'status.watertightBad': 'not watertight ✗',
+    'help.title': 'How to use',
+    'help.intro': 'Turn a DXF made of many disconnected line segments into continuous contours, then extrude them along Z into a 3D-printable solid model (STL). Everything is computed locally in your browser — the drawing is never uploaded.',
+    'help.s1t': 'Three steps',
+    'help.s1': '<b>1 Drop</b> DXF files (or a folder) into the queue on the left. The <b>×</b> at the right of each row removes just that file, leaving the others untouched.<br><b>2 Pick a level</b> on the right — Lossless / High / Medium / Minimal. The level also drives the facet count and STL size.<br><b>3 Export</b>: click "Build model", then "Export". The <b>File name</b> field on the left of the export bar renames the output (leave it empty to keep the source name; <code>{name}</code> = source name, <code>{n}</code> = index) and the text beside it previews the exact names that will be written.<br><b>Tip</b>: changing any parameter on the right <b>recomputes and refreshes the preview in place immediately</b> — no need to click "Build model" again. In the middle, <b>drag to rotate</b> and <b>scroll to zoom</b> the 3D preview.',
+    'help.s2t': 'Detail levels and facet count',
+    'help.s2': 'Levels are defined by the share of vertices kept: <b>Lossless 100%</b> (original vertices, no simplification at all), <b>High 30%</b>, <b>Medium 10%</b>, <b>Minimal 3%</b>. Simplification uses Douglas-Peucker with a binary search on tolerance to hit the target vertex count exactly.<br>Facet count after extrusion = <b>(contour vertices − 2) × 2 for the two caps + contour vertices × 2 for the walls</b>. On the sample drawing shipped with this tool: Lossless is 7352 facets / ≈368 KB, Minimal is 232 facets / ≈12 KB. So <b>the level matters far more for STL than for a stroked SVG</b> — facet count drives slicing time and file size.',
+    'help.s3t': '3D model parameters (Pro mode)',
+    'help.s3': '<b>Extrusion height</b>: thickness extruded along Z (mm).<br><b>Exact-size</b>: simplification only removes vertices, so it also removes the drawing extremes and the model ends up slightly smaller (measured 0.199 / 0.180 mm on the Minimal level). Enabling this re-inserts the extremes at their original position so that <b>all four levels produce a model exactly the size of the drawing</b>, at a cost of 3–4 extra vertices. <b>Keep it on.</b><br><b>Placement</b>: defaults to "XY centered, Z from 0", which matches slicer habits; you can also keep the drawing coordinates.<br><b>Mirror X / Y</b>: faster than asking the customer to fix a mirrored drawing.<br><b>STL format</b>: binary is smaller and most compatible; ascii is easier to inspect.<br><b>Watertight self-check</b>: verifies that every edge is shared by exactly two facets, the Euler characteristic is 2, and normals point outward.<br><b>Flip normals</b>: a rescue switch, only for when a slicer shows the model inside-out.',
+    'help.s4t': 'Geometry parameters (Pro mode)',
+    'help.s4': '<b>Snap tolerance</b>: distance threshold for treating two endpoints as the same point. Default 0 requires exact equality; raise it to bridge small gaps automatically.<br><b>Curve flattening</b>: chord height error for arcs, circles, ellipses and splines — smaller is smoother and finer.<br><b>Drawing unit</b>: how many millimeters one drawing unit equals.<br>The SVG parameters (stroke width, color, keep offset, merge into one path) affect the <b>attached SVG export only</b> and never the 3D model.',
+    'help.faq1q': 'Why does the model size differ from the drawing by a hair?',
+    'help.faq1a': 'STL coordinates are 32-bit floats, which at the 300 mm scale gives a resolution of about 3×10⁻⁵ mm (30 nanometres) — that is the precision limit of the STL format itself and has no effect on 3D printing. Beyond that, as long as "Exact-size" stays on, the model bounding box matches the drawing numerically.',
+    'help.faq2q': 'Why is text / hatching / dimensions missing?',
+    'help.faq2a': 'Only geometry contours are converted (lines, polylines, arcs, circles, ellipses, splines, block references). Text, hatches and dimensions are not converted — and they are never silently skipped: the banner lists the ignored entity types and counts.',
+    'help.faq3q': 'How are open contours and holes handled?',
+    'help.faq3a': 'Extruding a solid requires closed contours. Open chains cannot become a solid, so they are explicitly reported and skipped (never silently turned into a wrong model). If the drawing has small gaps, raise "Snap tolerance" until the endpoints snap into a loop. Nested contours (holes) are <b>cut out automatically</b> by nesting depth (depth 0 solid / depth 1 hole / depth 2 island, alternating). In Pro mode the "Contour roles" panel lists every ring and lets you assign Solid / Hole / Ignore manually; to get the legacy behaviour back (fill everything), switch "Nested contours (holes)" to "Fill everything".',
+    'help.faq4q': 'Is batch processing supported?',
+    'help.faq4a': 'Yes. Drop several files or a whole folder, click "Build model", then "Export". With Chrome / Edge you can pick an output folder and files are written one by one; other browsers fall back to a ZIP download. Large batches of STL files take a while — please be patient.',
+    'help.faq5q': 'How do I know the model will actually print?',
+    'help.faq5a': 'Before export the tool runs a watertight self-check: every edge is shared by exactly two facets (no boundary or non-manifold edges), the Euler characteristic V−E+F = 2, and the signed volume is positive (normals point outward). These four cover the <b>not watertight</b> and <b>inside-out</b> errors that slicers most often report. The diagnostics bar shows the result; after loading the STL into your slicer, also confirm the size matches the drawing and that no repair is suggested.',
+    'help.privacyT': 'Privacy',
+    'help.privacy': 'This page hard-codes <code>connect-src \'none\'</code> in its security policy, which blocks every network egress at the browser level (fetch / XHR / WebSocket / sendBeacon are all refused). Your drawing only ever lives in browser memory; chaining and extrusion issue no network request and the server never touches your file. The exported STL header <b>does not contain the source file name</b>, so no customer information travels with the file. Save this file locally, unplug the network cable, and it still works.',
+    'term.title': 'Glossary (EN / 中文)',
+    'term.chain': 'chaining / 链化', 'term.lossless': 'lossless / 无损', 'term.ratio': 'vertex reduction ratio / 顶点数压缩比',
+    'term.dev': 'maximum deviation / 最大偏差', 'term.gap': 'gap / 断口', 'term.eps': 'snap tolerance / 吸附容差',
+    'term.branch': 'branch point / 分支点', 'term.open': 'open chain / 开口链',
+    'term.physical': 'physical size / 物理尺寸',
+    'term.extrude': 'extrusion / 挤出', 'term.mesh': 'mesh / 网格', 'term.facet': 'facet / 三角面',
+    'term.watertight': 'watertight / 水密', 'term.normal': 'normal / 法向', 'term.earcut': 'ear clipping / 耳切三角化',
+    'term.stl': 'STL solid model / STL 实体数模', 'term.manifold': 'manifold / 流形'
+  }
+};
+
+/* ---------------- 参数 schema ---------------- */
+var TIERS = [
+  { key: 'lossless', ratio: 1.0 },
+  { key: 'high', ratio: 0.30 },
+  { key: 'medium', ratio: 0.10 },
+  { key: 'minimal', ratio: 0.03 }
+];
+var PARAM_SCHEMA = [
+  /* ---- 三维数模主体 ---- */
+  { key: 'tier', type: 'tiers', def: 'lossless', mode: 'simple', i18n: 'params.tier', group: 'model' },
+  { key: 'ratio', type: 'range', min: 1, max: 100, step: 1, def: 100, mode: 'pro', i18n: 'params.ratio', hint: 'hint.ratio', suffix: '%', group: 'model' },
+  { key: 'height', type: 'number', min: 0.1, max: 500, step: 0.5, def: 3, mode: 'simple', i18n: 'params.height', hint: 'hint.height', suffix: 'mm', group: 'model' },
+  { key: 'nestMode', type: 'select', options: ['auto', 'fill'], def: 'auto', mode: 'pro', i18n: 'params.nestMode', hint: 'hint.nestMode', group: 'model' },
+  /* 简易模式只留「档位 + 挤出高度」两个真正常用的项。以下参数在简易模式下一律走
+     schema 里的默认值并在界面隐藏，只在专业模式可调：
+       尺寸保真 = 开、放置方式 = XY 居中、嵌套轮廓 = 自动、
+       图纸单位 = 毫米 mm、STL 格式 = binary */
+  { key: 'fidelity', type: 'checkbox', def: true, mode: 'pro', i18n: 'params.fidelity', hint: 'hint.fidelity', group: 'model' },
+  /* ---- 放置 ---- */
+  { key: 'place', type: 'select', options: ['center', 'origin'], def: 'center', mode: 'pro', i18n: 'params.place', hint: 'hint.place', group: 'place' },
+  { key: 'mirrorX', type: 'checkbox', def: false, mode: 'pro', i18n: 'params.mirrorX', hint: 'hint.mirrorX', group: 'place' },
+  { key: 'mirrorY', type: 'checkbox', def: false, mode: 'pro', i18n: 'params.mirrorY', hint: 'hint.mirrorY', group: 'place' },
+  /* ---- 几何 ---- */
+  { key: 'unit', type: 'select', options: ['mm', 'cm', 'inch'], def: 'mm', mode: 'pro', i18n: 'params.unit', hint: 'hint.unit', group: 'geometry' },
+  { key: 'eps', type: 'number', min: 0, max: 100, step: 0.001, def: 0, mode: 'pro', i18n: 'params.eps', hint: 'hint.eps', suffix: 'mm', group: 'geometry' },
+  { key: 'curveTol', type: 'number', min: 0.0001, max: 5, step: 0.005, def: 0.02, mode: 'pro', i18n: 'params.curveTol', hint: 'hint.curveTol', suffix: 'mm', group: 'geometry' },
+  /* ---- STL 输出 ---- */
+  { key: 'stlFormat', type: 'select', options: ['binary', 'ascii'], def: 'binary', mode: 'pro', i18n: 'params.stlFormat', hint: 'hint.stlFormat', group: 'stl' },
+  { key: 'selfCheck', type: 'checkbox', def: true, mode: 'pro', i18n: 'params.selfCheck', hint: 'hint.selfCheck', group: 'stl' },
+  { key: 'flipNormals', type: 'checkbox', def: false, mode: 'pro', i18n: 'params.flipNormals', hint: 'hint.flipNormals', group: 'stl' },
+  /* ---- SVG 附带输出（次要功能：只影响 SVG，绝不影响三维数模）---- */
+  { key: 'strokeWidth', type: 'number', min: 0.01, max: 5, step: 0.05, def: 0.25, mode: 'pro', i18n: 'params.strokeWidth', hint: 'hint.strokeWidth', suffix: 'mm', group: 'svg' },
+  { key: 'strokeColor', type: 'color', def: '#000000', mode: 'pro', i18n: 'params.strokeColor', group: 'svg' },
+  { key: 'keepOffset', type: 'checkbox', def: false, mode: 'pro', i18n: 'params.keepOffset', group: 'svg' },
+  { key: 'singlePath', type: 'checkbox', def: false, mode: 'pro', i18n: 'params.singlePath', group: 'svg' }
+];
+var GROUP_ORDER = [
+  { id: 'model', zh: '三维数模', en: '3D model' },
+  { id: 'rings', zh: '轮廓角色（自动 / 手动）', en: 'Contour roles (auto / manual)' },
+  { id: 'place', zh: '放置', en: 'Placement' },
+  { id: 'geometry', zh: '几何', en: 'Geometry' },
+  { id: 'stl', zh: 'STL 输出', en: 'STL output' },
+  { id: 'svg', zh: 'SVG 附带输出', en: 'Attached SVG' }
+];
+var UNIT_SCALE = { mm: 1, cm: 10, inch: 25.4 };
+var UNIT_FROM_INSUNITS = { 1: 'inch', 4: 'mm', 5: 'cm' };
+var LS_KEY = 'dxf2svg.v1';
+var MAX_BYTES = 50 * 1024 * 1024;
+/* 选择型参数的选项文案 key 前缀：unit.xxx / place.xxx / stl.xxx / nest.xxx */
+var SELECT_PREFIX = { unit: 'unit.', place: 'place.', stlFormat: 'stl.', nestMode: 'nest.' };
+/* 轮廓角色可选值（自动为主，手动可覆写） */
+var ROLES = ['auto', 'solid', 'hole', 'skip'];
+var ROLE_PREFIX = 'role.';
+
+/* ---------------- 状态 ---------------- */
+var S = {
+  lang: 'zh', mode: 'simple', view: 'model',
+  params: {}, files: [], activeId: null, picking: false, ringSel: -1
+};
+/* 三维相机：正交投影 + 方位角/俯仰角。默认俯视 28°、方位 −35°，
+   是「一块平放的板件」最容易看懂的角度。 */
+var CAM = { az: -35, ex: 28, zoom: 1, panX: 0, panY: 0, spin: false };
+var CAM_DEFAULT = { az: -35, ex: 28, zoom: 1, panX: 0, panY: 0 };
+function camReset() {
+  CAM.az = CAM_DEFAULT.az; CAM.ex = CAM_DEFAULT.ex;
+  CAM.zoom = 1; CAM.panX = 0; CAM.panY = 0;
+}
+var uid = 0;
+
+function t(k, vars) {
+  var pack = I18N[S.lang] || I18N.zh;
+  var s = pack[k];
+  if (s === undefined) s = (I18N.en[k] !== undefined ? I18N.en[k] : k);
+  if (vars) for (var p in vars) s = s.split('{' + p + '}').join(vars[p]);
+  return s;
+}
+function toast(msg) {
+  var box = $('#toast'), el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg; box.appendChild(el);
+  setTimeout(function () { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; }, 1900);
+  setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 2400);
+}
+
+/* ---------------- 参数面板 ---------------- */
+function loadParams() {
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (e) { saved = null; }
+  if (saved && saved.params) {
+    S.lang = saved.lang === 'en' ? 'en' : 'zh';
+    S.mode = saved.mode === 'pro' ? 'pro' : 'simple';
+    S.view = saved.view === 'contour' ? 'contour' : 'model';
+  }
+  PARAM_SCHEMA.forEach(function (d) { S.params[d.key] = d.def; });
+  if (saved && saved.params) {
+    PARAM_SCHEMA.forEach(function (d) { if (saved.params[d.key] !== undefined) S.params[d.key] = saved.params[d.key]; });
+  }
+  ['stl', 'svg', 'png'].forEach(function (k) { S['exp_' + k] = false; });
+  S.exp_stl = true;                        /* 主功能：三维数模 */
+  if (saved && saved.exp) { ['stl', 'svg', 'png'].forEach(function (k) { S['exp_' + k] = !!saved.exp[k]; }); }
+  S.expName = sanitizeFileName(saved && saved.expName) || '';
+}
+function saveParams() {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      lang: S.lang, mode: S.mode, view: S.view, params: S.params, expName: S.expName,
+      exp: { stl: S.exp_stl, svg: S.exp_svg, png: S.exp_png }
+    }));
+  } catch (e) { /* 隐私模式等场景忽略 */ }
+}
+function ratioOf() {
+  if (S.mode === 'simple') {
+    var tier = TIERS.filter(function (x) { return x.key === S.params.tier; })[0] || TIERS[0];
+    return tier.ratio;
+  }
+  return Math.max(0.01, Math.min(1, (S.params.ratio || 100) / 100));
+}
+function syncRatioFromTier() {
+  var tier = TIERS.filter(function (x) { return x.key === S.params.tier; })[0] || TIERS[0];
+  S.params.ratio = Math.round(tier.ratio * 100);
+  var el = document.querySelector('[data-p="ratio"]');
+  if (el) el.value = S.params.ratio;
+  var lab = document.querySelector('[data-pv="ratio"]');
+  if (lab) lab.textContent = S.params.ratio + '%';
+}
+function renderParams() {
+  var host = $('#params'); host.innerHTML = '';
+  $('#pMode').textContent = S.mode === 'pro' ? t('mode.pro') : t('mode.simple');
+  GROUP_ORDER.forEach(function (g) {
+    /* 「轮廓角色」不是普通参数项：它按当前文件的环列表动态渲染，单独处理。
+       简易模式不渲染该面板（会自动挖孔，无需逐环指定）。 */
+    if (g.id === 'rings') {
+      var rp = ringsPanel();
+      if (rp) host.appendChild(rp);
+      return;
+    }
+    var items = PARAM_SCHEMA.filter(function (d) {
+      if (d.group !== g.id) return false;
+      return S.mode === 'pro' || d.mode === 'simple';
+    });
+    if (!items.length) return;
+    var box = document.createElement('div'); box.className = 'pgroup';
+    var h = document.createElement('h3'); h.textContent = S.lang === 'en' ? g.en : g.zh; box.appendChild(h);
+    items.forEach(function (d) { box.appendChild(fieldFor(d)); });
+    host.appendChild(box);
+  });
+  /* 诊断详情同样只在专业模式出现 —— 简易界面保持「拖入 → 选档 → 导出」三步。 */
+  if (S.mode === 'pro') {
+    var warn = document.createElement('div'); warn.className = 'pgroup';
+    warn.innerHTML = '<h3>' + t('diag.detail') + '</h3><div id="diagInline" style="font-size:11.5px;color:var(--txt2);line-height:1.7"></div>';
+    host.appendChild(warn);
+    renderDiagInline();
+  }
+}
+/* 轮廓角色面板（**仅专业模式**）：自动判定为主，逐环可手动覆写（实体 / 孔洞 / 忽略）。
+   简易模式一律走「自动挖孔」，不渲染本面板 —— 简易界面的目标是尽量少选项。 */
+function ringsPanel() {
+  if (S.mode !== 'pro') return null;
+  var box = document.createElement('div'); box.className = 'pgroup';
+  var h = document.createElement('h3');
+  h.textContent = (S.lang === 'en' ? 'Contour roles (auto / manual)' : '轮廓角色（自动 / 手动）');
+  box.appendChild(h);
+  var a = active(), roles = (a && a.res && a.res.ringRoles) || [];
+  var rows = [];
+  roles.forEach(function (r, ci) { if (r) rows.push({ ci: ci, r: r }); });
+  if (!rows.length) {
+    var e = document.createElement('div');
+    e.style.cssText = 'font-size:11.5px;color:var(--txt3)';
+    e.textContent = t('rings.none');
+    box.appendChild(e);
+    return box;
+  }
+  var list = document.createElement('div'); list.className = 'ringlist';
+  rows.forEach(function (it) {
+    var row = document.createElement('div');
+    row.className = 'ringrow' + (S.ringSel === it.ci ? ' sel' : '');
+    row.setAttribute('data-ring', String(it.ci));
+    var info = document.createElement('div'); info.className = 'ri';
+    info.innerHTML = '<b>#' + it.ci + '</b> <span class="rg">' + t('rings.depth') + ' ' + it.r.depth + '</span>'
+      + ' <span class="rg">' + t('role.' + (it.r.role || 'solid')) + '</span>'
+      + '<div class="rg">' + t('rings.autoIs') + ' ' + t('role.' + it.r.auto) + '</div>';
+    row.appendChild(info);
+    var sel = document.createElement('select');
+    sel.setAttribute('data-ringrole', String(it.ci));
+    sel.title = t('diag.rings');
+    ROLES.forEach(function (v) {
+      var op = document.createElement('option'); op.value = v; op.textContent = t(ROLE_PREFIX + v);
+      if ((it.r.role || 'auto') === v) op.selected = true;
+      sel.appendChild(op);
+    });
+    row.appendChild(sel);
+    var loc = document.createElement('button');
+    loc.type = 'button'; loc.className = 'ghost';
+    loc.setAttribute('data-ringlocate', String(it.ci));
+    loc.textContent = t('rings.locate');
+    row.appendChild(loc);
+    list.appendChild(row);
+  });
+  box.appendChild(list);
+  var rst = document.createElement('button');
+  rst.type = 'button'; rst.className = 'ghost'; rst.id = 'btnRoleReset';
+  rst.style.cssText = 'margin-top:8px;font-size:11px;padding:2px 8px';
+  rst.textContent = t('rings.reset');
+  box.appendChild(rst);
+  return box;
+}
+/* 设定某条闭合链的角色覆写。角色只影响输出段 → 直接同步重算，不动几何缓存。 */
+function setRingRole(ci, v) {
+  var a = active();
+  if (!a || !a.res || !a.res.ringRoles) return;
+  var r = a.res.ringRoles[ci];
+  if (!r) return;
+  a.roleOv = a.roleOv || {};
+  if (v === 'auto') delete a.roleOv[r.ring];
+  else a.roleOv[r.ring] = v;
+  a.roleOvSig = geomSig(pipeOpts());
+  computeFile(a, null);
+  renderParams();
+}
+function fieldFor(d) {
+  var wrap = document.createElement('div');
+  wrap.className = (d.type === 'tiers' || d.type === 'range') ? 'field stack' : 'field';
+  var lab = document.createElement('label');
+  lab.innerHTML = '<span>' + t(d.i18n) + (d.suffix ? ' <span class="v" data-pv="' + d.key + '">' + S.params[d.key] + ' ' + d.suffix + '</span>' : '') + '</span>' +
+    (d.hint ? '<span class="hint">' + t(d.hint) + '</span>' : '');
+  var ctl = document.createElement('div'); ctl.className = 'ctl';
+  if (d.type === 'tiers') {
+    var grid = document.createElement('div'); grid.className = 'tiers';
+    TIERS.forEach(function (tr) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.setAttribute('data-tier', tr.key);
+      b.setAttribute('aria-pressed', String(S.params.tier === tr.key));
+      b.innerHTML = '<span>' + t('tier.' + tr.key) + '</span><small>' + Math.round(tr.ratio * 100) + '%</small>';
+      b.addEventListener('click', function () { setParam('tier', tr.key); syncRatioFromTier(); onParamChange(); renderParams(); });
+      grid.appendChild(b);
+    });
+    ctl.appendChild(grid);
+  } else if (d.type === 'range') {
+    var r = document.createElement('input');
+    r.type = 'range'; r.min = d.min; r.max = d.max; r.step = d.step; r.value = S.params[d.key];
+    r.setAttribute('data-p', d.key);
+    r.addEventListener('input', function () {
+      setParam(d.key, parseFloat(r.value));
+      var pv = document.querySelector('[data-pv="' + d.key + '"]'); if (pv) pv.textContent = r.value + (d.suffix || '');
+      onParamChange();
+    });
+    ctl.appendChild(r);
+  } else if (d.type === 'select') {
+    var s = document.createElement('select'); s.setAttribute('data-p', d.key);
+    var pre = SELECT_PREFIX[d.key] || '';
+    d.options.forEach(function (o) {
+      var op = document.createElement('option'); op.value = o; op.textContent = t(pre + o);
+      if (S.params[d.key] === o) op.selected = true; s.appendChild(op);
+    });
+    s.addEventListener('change', function () { setParam(d.key, s.value); onParamChange(); });
+    ctl.appendChild(s);
+  } else if (d.type === 'checkbox') {
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!S.params[d.key];
+    cb.setAttribute('data-p', d.key);
+    cb.addEventListener('change', function () { setParam(d.key, cb.checked); onParamChange(); });
+    ctl.appendChild(cb);
+  } else if (d.type === 'color') {
+    var cl = document.createElement('input'); cl.type = 'color'; cl.value = S.params[d.key];
+    cl.setAttribute('data-p', d.key);
+    cl.addEventListener('input', function () { setParam(d.key, cl.value); onParamChange(); });
+    ctl.appendChild(cl);
+  } else {
+    var n = document.createElement('input');
+    n.type = 'number'; n.min = d.min; n.max = d.max; n.step = d.step; n.value = S.params[d.key];
+    n.setAttribute('data-p', d.key);
+    n.addEventListener('change', function () {
+      var v = parseFloat(n.value);
+      if (isNaN(v)) v = d.def;
+      v = Math.max(d.min, Math.min(d.max, v));
+      n.value = v; setParam(d.key, v); onParamChange();
+    });
+    ctl.appendChild(n);
+  }
+  wrap.appendChild(lab); wrap.appendChild(ctl);
+  return wrap;
+}
+function setParam(k, v) { S.params[k] = v; saveParams(); }
+
+/* ---------------- 队列 ---------------- */
+function renderQueue() {
+  var list = $('#list'); list.innerHTML = '';
+  S.files.forEach(function (f) {
+    var el = document.createElement('div');
+    el.className = 'item'; el.setAttribute('role', 'button'); el.tabIndex = 0;
+    el.setAttribute('aria-current', String(f.id === S.activeId));
+    var st = f.status;
+    el.innerHTML = '<span class="dot ' + (st === 'done' ? 'done' : st === 'error' ? 'err' : st === 'working' ? 'work' : st === 'stale' ? 'stale' : '') + '"></span>' +
+      '<span class="nm" title="' + f.name.replace(/"/g, '&quot;') + '">' + f.name + '</span>' +
+      '<span class="sz">' + (f.size / 1024).toFixed(0) + 'K</span>';
+    /* 单项移除：真实 <button>，可键盘操作，且不触发选中 */
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.textContent = '\u00D7';
+    del.title = t('queue.remove');
+    del.setAttribute('aria-label', t('queue.remove') + ': ' + f.name);
+    del.addEventListener('click', function (ev) {
+      ev.preventDefault(); ev.stopPropagation();
+      removeFile(f.id);
+    });
+    el.appendChild(del);
+    el.addEventListener('click', function () { selectFile(f.id); });
+    el.addEventListener('keydown', function (ev) {
+      if (ev.target !== el) return;            // 焦点在「移除」按钮上时不误触发选中
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); selectFile(f.id); }
+    });
+    list.appendChild(el);
+  });
+  $('#queueHint').style.display = S.files.length ? 'none' : '';
+  renderExpName();          /* 队列/选中项变化 → 同步「将导出成什么文件名」 */
+}
+/* 只移除选中的那一个文件，其余不受影响；被移除的若是当前文件则自动切到相邻文件 */
+function removeFile(id) {
+  var i = -1;
+  for (var k = 0; k < S.files.length; k++) { if (S.files[k].id === id) { i = k; break; } }
+  if (i < 0) return;
+  var name = S.files[i].name, wasActive = (S.activeId === id);
+  S.files.splice(i, 1);
+  if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+  if (wasActive) S.activeId = S.files.length ? S.files[Math.min(i, S.files.length - 1)].id : null;
+  renderQueue();
+  var f = active();
+  if (!f) {                        // 队列已空 → 回到初始态
+    drawStage(); renderStats(); renderDiag();
+    hideBanner('bnUnits'); hideBanner('bnUnsupported'); hideBanner('bnError');
+  } else if (f.status === 'stale' || (f.status !== 'error' && !f.res)) {
+    computeFile(f, null);          // 切到的文件若未算过则自动补算
+  } else {
+    drawStage(); renderStats(); renderDiag(); renderEnvBanner(); renderUnsupported();
+  }
+  toast(t('msg.removed', { name: name }));
+}
+function addFiles(fileList) {
+  var arr = Array.prototype.slice.call(fileList).filter(function (f) { return /\.dxf$/i.test(f.name); });
+  if (!arr.length) return;
+  arr.forEach(function (f) {
+    S.files.push({ id: ++uid, name: f.name, size: f.size, file: f, status: 'idle', res: null, err: '' });
+  });
+  if (S.activeId === null) S.activeId = S.files[S.files.length - 1].id;
+  renderQueue();
+  analyze(S.files[S.files.length - 1].id);
+}
+function clearAll() {
+  if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
+  S.files = []; S.activeId = null; renderQueue(); drawStage(); renderStats(); renderDiag();
+  hideBanner('bnError'); hideBanner('bnUnsupported'); hideBanner('bnUnits');
+}
+
+/* ---------------- 转换流水线 ---------------- */
+function readAsText(file) {
+  return new Promise(function (res, rej) {
+    var fr = new FileReader();
+    fr.onload = function () { res(String(fr.result)); };
+    fr.onerror = function () { rej(new Error('read failed')); };
+    fr.readAsText(file, 'utf-8');
+  });
+}
+/* 流水线拆两段，参数变更时只重算必要部分：
+ *   prepare(text, opt) —— 几何段，只依赖 eps / curveTol：解析 → 实体转换 → 端点归并 → 链化
+ *   finish(prep, opt)  —— 输出段，依赖 ratio / unit / 线宽 / 颜色 / 坐标策略：简化 → 包围盒 → 统计
+ * 于是改「精度、合并单条 path、保留原坐标偏移」这类参数只跑 finish（毫秒级），
+ * 预览可以原位刷新，不需要重读文件，也绝不需要用户再点一次「转换全部」。
+ */
+function geomSig(opt) { return (opt.eps || 0) + '|' + (opt.curveTol || 0.02); }
+
+function prepare(text, opt) {
+  var parsed = parseDxf(text);
+  var conv = entitiesToPolylines(parsed, { curveTol: opt.curveTol });
+  var g = flattenToGraph(conv.polylines, opt.eps);
+  var chained = buildChains(g.points, g.edges);
+  var base = chained.chains.map(function (c) {
+    return { ids: c.ids, closed: c.closed, raw: c.ids.map(function (i) { return g.points[i]; }) };
+  });
+  /* 轮廓质量体检放在几何段（只依赖 eps / curveTol）→ 按签名缓存，
+     改输出参数时不会重跑。实测样例 1839 点自交检测约 30 ms。 */
+  var closedRaw = base.filter(function (c) { return c.closed; }).map(function (c) { return c.raw; });
+  var selfInt = 0, selfSamples = [];
+  for (var qi = 0; qi < closedRaw.length; qi++) {
+    var r = countSelfIntersections(closedRaw[qi]);
+    selfInt += r.count;
+    if (r.samples.length && selfSamples.length < 5) selfSamples = selfSamples.concat(r.samples);
+  }
+  var nested = detectNesting(closedRaw.map(function (pts) { return { pts: pts }; }));
+  return {
+    sig: geomSig(opt), parsed: parsed, conv: conv, graph: g, base: base,
+    branchPoints: chained.branchPoints,
+    gaps: computeGaps(g.points, chained.chains, Math.max(opt.eps, 0.5)),
+    l1Hit: checkL1(conv.polylines),
+    selfIntersections: selfInt, selfSamples: selfSamples, nestedPairs: nested.length,
+    rawVertexCount: base.reduce(function (a, c) { return a + c.raw.length; }, 0)
+  };
+}
+function finish(prep, opt) {
+  var ratio = opt.ratio;
+  var chains = prep.base.map(function (cb) {
+    var s = simplifyByRatio(cb.raw, cb.closed, ratio);
+    return {
+      ids: cb.ids, raw: cb.raw, closed: cb.closed,
+      pts: s.pts, tol: s.tol,
+      dev: ratio >= 1 ? 0 : maxDeviation(cb.raw, s.pts, cb.closed)
+    };
+  });
+  /* 输出画布尺寸一律取自「链化后的原始点列」包围盒，与简化档位无关。
+     否则每换一档物理尺寸都会微变（简化只会让极值点内缩），
+     而下游按尺寸下料时这是致命的不一致。 */
+  var bbox = bboxOf(chains.map(function (c) { return { pts: c.raw }; }));
+
+  /* ---- 三维数模：轮廓 → 挤出 → float32 网格 ----
+     轮廓取「当前档位点列」；尺寸保真开启时把极值点插回，使四档模型尺寸
+     全部等于图纸尺寸。开口链无法成实体 → 只告警跳过，绝不静默产出错误模型。 */
+  var closedRings = [], ringChain = [], pinnedAdd = 0, openChains = 0;
+  chains.forEach(function (c, ci) {
+    if (!c.closed) { openChains++; return; }
+    var pts = c.pts;
+    if (opt.fidelity) {
+      var p2 = reinsertExtremes(c.raw, c.pts);
+      if (p2.length > pts.length) pinnedAdd += p2.length - pts.length;
+      pts = p2;
+    }
+    closedRings.push(pts);
+    ringChain.push(ci);
+  });
+  /* 嵌套判定 + 组装「外轮廓 + 孔洞」。auto 模式按深度奇偶；fill 模式全当独立实体（旧行为）。
+     手动覆写来自当前文件的 f.roleOv（几何参数变更时会自动清空）。 */
+  var nesting = buildNesting(closedRings);
+  var plan = planSolids(closedRings, nesting, opt.nestMode, opt.roleOv);
+  var loops = [];
+  plan.groups.forEach(function (grp) {
+    loops.push({
+      pts: closedRings[grp.outer], closed: true,
+      holes: grp.holes.map(function (h) { return closedRings[h]; })
+    });
+  });
+  /* 供界面用：按「链序号」索引的角色表（二维轮廓视图按链顺序绘制） */
+  var ringRoles = [], orientMismatch = 0, autoHoles = 0, nestedCount = 0;
+  plan.roles.forEach(function (r) {
+    /* CAD 通行约定：外轮廓 CCW、孔洞 CW → 方向可作旁证；与深度规则不一致时报警 */
+    var expectCcw = (r.auto !== 'hole');
+    if (r.role !== 'skip' && r.ccw !== expectCcw) orientMismatch++;
+    if (r.role === 'hole') autoHoles++;
+    if (r.depth % 2 === 1) nestedCount++;
+    ringRoles[ringChain[r.i]] = {
+      ring: r.i, depth: r.depth, parent: r.parent, auto: r.auto, role: r.role,
+      orphan: !!r.orphan, ccw: r.ccw
+    };
+  });
+  var mesh = null, mstat = null, meshErr = '';
+  var unitScale = UNIT_SCALE[opt.unit] || 1;
+  if (loops.length) {
+    try {
+      mesh = quantizeMesh(extrudeMesh(loops, {
+        height: opt.height, zBase: 0,
+        centerXY: opt.place === 'center',
+        mirrorX: opt.mirrorX, mirrorY: opt.mirrorY,
+        scale: unitScale
+      }));
+      mstat = meshReport(mesh);
+    } catch (e) {
+      mesh = null; mstat = null; meshErr = (e && e.message) || String(e);
+    }
+  }
+  return {
+    prep: prep, parsed: prep.parsed, conv: prep.conv, graph: prep.graph,
+    chains: chains, bbox: bbox, gaps: prep.gaps, branchPoints: prep.branchPoints,
+    l1Hit: prep.l1Hit, rawVertexCount: prep.rawVertexCount,
+    outVertexCount: chains.reduce(function (a, c) { return a + c.pts.length; }, 0),
+    ratio: ratio, unit: opt.unit, unitScale: unitScale,
+    declaredUnit: UNIT_FROM_INSUNITS[prep.parsed.insUnits] || null,
+    maxDev: chains.reduce(function (a, c) { return Math.max(a, c.dev); }, 0),
+    closedCount: chains.filter(function (c) { return c.closed; }).length,
+    openCount: chains.filter(function (c) { return !c.closed; }).length,
+    /* --- 三维数模结果 --- */
+    mesh: mesh, mstat: mstat, meshErr: meshErr,
+    height: opt.height, place: opt.place, fidelity: !!opt.fidelity,
+    nestMode: opt.nestMode, ringRoles: ringRoles, holeCount: autoHoles,
+    nestedCount: nestedCount, orientMismatch: orientMismatch, nestingDepth: nesting.depth,
+    pinnedAdd: pinnedAdd, openChains: openChains,
+    selfIntersections: prep.selfIntersections, nestedPairs: prep.nestedPairs,
+    /* 模型尺寸取自 float32 顶点表，保证「界面显示 = 导出文件」 */
+    modelBox: mstat ? mstat.bbox : null,
+    isWatertight: mstat ? mstat.watertight : false
+  };
+}
+function pipeline(text, opt) { return finish(prepare(text, opt), opt); }
+function checkL1(polylines) {
+  if (polylines.length < 2) return polylines.length === 1;
+  for (var i = 0; i + 1 < polylines.length; i++) {
+    var a = polylines[i].pts, b = polylines[i + 1].pts;
+    var ea = a[a.length - 1], sb = b[0];
+    if (ea[0] !== sb[0] || ea[1] !== sb[1]) return false;
+  }
+  return true;
+}
+function pipeOpts() {
+  return {
+    ratio: ratioOf(), eps: +S.params.eps || 0, curveTol: +S.params.curveTol || 0.02,
+    unit: S.params.unit, strokeWidth: +S.params.strokeWidth || 0.25,
+    strokeColor: S.params.strokeColor, keepOffset: !!S.params.keepOffset, singlePath: !!S.params.singlePath,
+    /* ---- 三维数模（全部属于「输出段」→ 改这些参数只需重跑 finish，不重读文件）---- */
+    height: +S.params.height > 0 ? +S.params.height : 3,
+    fidelity: S.params.fidelity !== false,
+    place: S.params.place === 'origin' ? 'origin' : 'center',
+    mirrorX: !!S.params.mirrorX, mirrorY: !!S.params.mirrorY,
+    stlFormat: S.params.stlFormat === 'ascii' ? 'ascii' : 'binary',
+    flipNormals: !!S.params.flipNormals,
+    selfCheck: S.params.selfCheck !== false,
+    nestMode: S.params.nestMode === 'fill' ? 'fill' : 'auto'
+  };
+}
+function byId(id) { return S.files.filter(function (x) { return x.id === id; })[0] || null; }
+/* 统一的「算一个文件」入口。
+ * 几何段（prepare）按签名缓存：eps / curveTol 没变就复用，只跑输出段。
+ * 出错时**保留上一次的 f.res**，因此预览永远不会被清空到无法恢复。 */
+function computeFile(f, done) {
+  var opt = pipeOpts(), sig = geomSig(opt);
+  /* 轮廓角色手动覆写是**按环序号**记的，而环序号只在几何段相同时才稳定。
+     切成几何参数（eps / curveTol）会重建几何段 → 环的数量与顺序可能变
+     → 手动设定必须作废，否则会把「孔洞」标到一个完全不相干的环上。 */
+  if (f.roleOvSig && f.roleOvSig !== sig) {
+    f.roleOv = null; f.roleOvSig = null;
+    if (f.id === S.activeId) toast(t('rings.cleared'));
+  }
+  opt.roleOv = f.roleOv || null;
+  f.seq = (f.seq || 0) + 1;
+  var seq = f.seq;                         // 竞态保护：只有最新一次计算允许写回结果
+  function complete() {
+    if (f.seq === seq) {
+      renderQueue();
+      if (f.id === S.activeId) {
+        drawStage(); renderStats(); renderDiag(); renderEnvBanner();
+        renderUnsupported(); renderModelBanner();
+      }
+    }
+    if (done) done();
+  }
+  function settle(prep, err) {
+    if (f.seq !== seq) return;              // 已有更新的计算在路上 → 丢弃本次
+    if (err) {
+      f.status = 'error'; f.err = (err && err.message) || String(err);
+      showError(t('warn.failed', { msg: f.err }));
+      return;
+    }
+    try {
+      f.prep = prep;
+      f.res = finish(prep, opt);
+      f.status = 'done'; f.err = '';
+      /* 图纸自身声明了单位、且本会话用户未手动改过 → 自动预选并按新单位重算输出段 */
+      if (!S.unitTouched && f.res.declaredUnit && f.res.declaredUnit !== S.params.unit) {
+        setParam('unit', f.res.declaredUnit);
+        renderParams();
+        f.res = finish(f.prep, pipeOpts());
+      }
+    } catch (e2) {
+      f.status = 'error'; f.err = (e2 && e2.message) || String(e2);
+      showError(t('warn.failed', { msg: f.err }));
+    }
+  }
+  if (f.prep && f.prep.sig === sig) { settle(f.prep, null); complete(); return; }  // 纯输出参数 → 同步、毫秒级
+  showBusy(true);
+  readAsText(f.file).then(function (text) {
+    var prep = null, err = null;
+    try { prep = prepare(text, opt); } catch (e) { err = e; }
+    showBusy(false);
+    settle(prep, err); complete();
+  }, function () {
+    showBusy(false);
+    settle(null, new Error('read failed')); complete();
+  });
+}
+function analyze(id) {
+  var f = byId(id); if (!f) return;
+  if (f.size > MAX_BYTES) { f.status = 'error'; f.err = t('warn.large'); showError(f.err); renderQueue(); return; }
+  f.status = 'working'; renderQueue();
+  setTimeout(function () { computeFile(f, null); }, 0);
+}
+function convertAll() {
+  if (!S.files.length) { toast(t('warn.noFile')); return; }
+  var pending = S.files.filter(function (f) { return f.status !== 'done' || !f.res; });
+  if (!pending.length) { pending = S.files; }
+  var i = 0;
+  (function next() {
+    if (i >= pending.length) { toast(t('status.done')); return; }
+    var f = pending[i++];
+    if (!S.files.some(function (x) { return x.id === f.id; })) return next();   // 期间被移除
+    f.status = 'working'; renderQueue();
+    computeFile(f, next);
+  })();
+}
+/* 参数变更：绝不丢弃已有结果。
+ * ① 非当前文件的结果确实过期 → 打黄色待重算标记（切到它时会自动重算）
+ * ② 当前文件 → 防抖后原位重算并刷新预览，预览不再消失
+ */
+var refreshTimer = null;
+function onParamChange() {
+  S.files.forEach(function (f) { if (f.id !== S.activeId && f.status === 'done') f.status = 'stale'; });
+  renderQueue();
+  scheduleRefresh();
+}
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (!active()) return;
+  refreshTimer = setTimeout(function () {
+    refreshTimer = null;
+    var f = active();
+    if (!f || !f.file) return;
+    computeFile(f, null);
+  }, 140);   // 拖动滑块时防抖；纯输出参数重算 <30ms，体感即时
+}
+function active() { return S.files.filter(function (f) { return f.id === S.activeId; })[0] || null; }
+function selectFile(id) {
+  S.activeId = id;
+  S.ringSel = -1;                      /* 换文件 → 轮廓选中态归零（环序号属于文件） */
+  renderQueue();
+  var f = active();
+  /* 结果已过期或从未算过 → 选中即自动补算，杜绝「点进来是空白的」 */
+  if (f && (f.status === 'stale' || (f.status !== 'error' && !f.res))) { computeFile(f, null); return; }
+  drawStage(); renderStats(); renderDiag(); renderEnvBanner(); renderUnsupported();
+  renderModelBanner();
+}
+
+/* ---------------- 预览 ---------------- */
+var VIEW = { x: 0, y: 0, w: 1, h: 1, W: 1, H: 1, minX: 0, minY: 0 };
+function fitView() {
+  var box = VIEW._box; if (!box) return;
+  var s = VIEW._scale || 1;
+  var W = box.w * s, H = box.h * s;
+  var wrap = $('#stageWrap').getBoundingClientRect();
+  /* 容器还没布局（尺寸为 0，例如面板隐藏或非浏览器环境）→ 直接按 1:1 占满，避免算出 Infinity */
+  if (!(wrap.width > 0) || !(wrap.height > 0)) {
+    VIEW.W = W; VIEW.H = H; VIEW.x = 0; VIEW.y = 0; VIEW.w = W; VIEW.h = H;
+    applyView(); return;
+  }
+  var ar = wrap.width / wrap.height, dar = W / Math.max(1e-9, H);
+  if (ar > dar) { var w = H * ar; VIEW.x = -w / 2; VIEW.y = 0; VIEW.w = w; VIEW.h = H; }
+  else { var h = W / ar; VIEW.x = 0; VIEW.y = -h / 2; VIEW.w = W; VIEW.h = h; }
+  VIEW.W = W; VIEW.H = H;
+  applyView();
+}
+function applyView() {
+  var st = $('#stage');
+  st.setAttribute('viewBox', [VIEW.x.toFixed(4), VIEW.y.toFixed(4), VIEW.w.toFixed(4), VIEW.h.toFixed(4)].join(' '));
+  var chip = $('#chip');
+  if (chip && VIEW.W > 0) chip.textContent = 'zoom ' + (VIEW.W / VIEW.w).toFixed(2) + '×';
+}
+function drawStage2d() {
+  var st = $('#stage'), ph = $('#placeholder'), chip = $('#chip');
+  if (!st) return;
+  st.innerHTML = '';
+  var a = active();
+  if (!a || !a.res) { ph.style.display = ''; setHidden(chip, true); VIEW._box = null; return; }
+  ph.style.display = 'none'; setHidden(chip, false);
+  var res = a.res, s = res.unitScale, b = res.bbox;
+  var keep = !!S.params.keepOffset;
+  res.opts = { keepOffset: keep };
+  var W = b.w * s, H = b.h * s;
+  VIEW._box = keep ? { w: b.w, h: b.h, minX: b.minX, minY: b.minY } : { w: b.w, h: b.h, minX: 0, minY: 0 };
+  VIEW._scale = s;
+  VIEW._keep = keep;
+  var tf = keep
+    ? 'matrix(1 0 0 -1 0 ' + fmt((b.minY + b.maxY) * s, 6) + ')'
+    : 'matrix(1 0 0 -1 ' + fmt(-b.minX * s, 6) + ' ' + fmt(b.maxY * s, 6) + ')';
+  var vb = keep
+    ? [fmt(b.minX * s, 6), fmt(b.minY * s, 6), fmt(W, 6), fmt(H, 6)].join(' ')
+    : ['0', '0', fmt(W, 6), fmt(H, 6)].join(' ');
+  var NS = 'http://www.w3.org/2000/svg';
+  var g = document.createElementNS(NS, 'g');
+  g.setAttribute('transform', tf);
+  function pathD(pts, closed) {
+    var d = 'M' + fmt(pts[0][0], 6) + ' ' + fmt(pts[0][1], 6);
+    for (var i = 1; i < pts.length; i++) d += 'L' + fmt(pts[i][0], 6) + ' ' + fmt(pts[i][1], 6);
+    return closed ? d + 'Z' : d;
+  }
+  /* 未参与挤出的开口链：灰虚线 —— 让用户一眼看到"这部分没进模型" */
+  res.chains.forEach(function (c) {
+    if (c.closed) return;
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', pathD(c.pts, false));
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', '#9aa4b2');
+    p.setAttribute('stroke-width', '1');
+    p.setAttribute('stroke-dasharray', '4 3');
+    p.setAttribute('vector-effect', 'non-scaling-stroke');
+    g.appendChild(p);
+  });
+  /* 闭合环按「轮廓角色」着色，方便核对自动判定 / 手动指定 */
+  var roles = res.ringRoles || [];
+  res.chains.forEach(function (c, ci) {
+    if (!c.closed) return;
+    var r = roles[ci] || {};
+    var role = r.role || 'solid';
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('d', pathD(c.pts, true));
+    p.setAttribute('fill', 'none');
+    p.setAttribute('data-ring', String(ci));
+    var col = (S.params.strokeColor || '#000000');
+    if (role === 'hole') col = '#2f6fed';
+    else if (role === 'skip') col = '#9aa4b2';
+    p.setAttribute('stroke', col);
+    p.setAttribute('stroke-width', String(S.params.strokeWidth || 0.25));
+    if (role === 'skip') p.setAttribute('stroke-dasharray', '5 4');
+    p.setAttribute('stroke-linejoin', 'round');
+    p.setAttribute('stroke-linecap', 'round');
+    if (S.ringSel === ci) {                       /* 选中的环：加粗高亮 + 屏幕像素宽度 */
+      p.setAttribute('stroke', '#d85a30');
+      p.setAttribute('stroke-width', '2.4');
+      p.setAttribute('vector-effect', 'non-scaling-stroke');
+    }
+    g.appendChild(p);
+  });
+  st.appendChild(g);
+  st.setAttribute('viewBox', vb);
+  VIEW.x = parseFloat(vb.split(' ')[0]); VIEW.y = parseFloat(vb.split(' ')[1]);
+  VIEW.w = parseFloat(vb.split(' ')[2]); VIEW.h = parseFloat(vb.split(' ')[3]);
+  fitView();
+}
+
+/* 缩放平移 */
+(function bindPanZoom() {
+  var st = $('#stage'), drag = null;
+  st.addEventListener('pointerdown', function (e) {
+    if (!VIEW._box) return;
+    drag = { x: e.clientX, y: e.clientY, vx: VIEW.x, vy: VIEW.y };
+    st.classList.add('drag'); st.setPointerCapture(e.pointerId);
+  });
+  st.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var r = st.getBoundingClientRect();
+    var k = VIEW.w / r.width;
+    VIEW.x = drag.vx - (e.clientX - drag.x) * k;
+    VIEW.y = drag.vy - (e.clientY - drag.y) * k;
+    applyView();
+  });
+  st.addEventListener('pointerup', function () { drag = null; st.classList.remove('drag'); });
+  st.addEventListener('wheel', function (e) {
+    if (!VIEW._box) return;
+    e.preventDefault();
+    var r = st.getBoundingClientRect();
+    var fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    var k = e.deltaY < 0 ? 0.85 : 1 / 0.85;
+    var cx = VIEW.x + fx * VIEW.w, cy = VIEW.y + fy * VIEW.h;
+    VIEW.w *= k; VIEW.h *= k;
+    VIEW.x = cx - fx * VIEW.w; VIEW.y = cy - fy * VIEW.h;
+    applyView();
+  }, { passive: false });
+  $('#btnFit').addEventListener('click', viewFit);
+  $('#btnZoomIn').addEventListener('click', function () { viewZoom(0.8); });
+  $('#btnZoomOut').addEventListener('click', function () { viewZoom(1.25); });
+  function zoom(k) {
+    if (!VIEW._box) return;
+    var cx = VIEW.x + VIEW.w / 2, cy = VIEW.y + VIEW.h / 2;
+    VIEW.w *= k; VIEW.h *= k;
+    VIEW.x = cx - VIEW.w / 2; VIEW.y = cy - VIEW.h / 2;
+    applyView();
+  }
+  window.__zoom2d = zoom;
+})();
+
+/* ============================================================================
+ * 三维预览渲染器（正交投影 + 背面剔除 + 深度排序 + Lambert 明暗）
+ *
+ * 全部手写：不引入任何三维库，CSP 不放宽、仍是单文件零依赖。
+ * 为什么用 painter's algorithm 而不用 z-buffer：模型是**闭合实体**，
+ * 背面剔除之后前向面之间不存在互相遮挡，按质心深度排序即可得到正确结果，
+ * 而且能直接用 canvas 2D 的填充路径，无需逐像素操作。
+ * ==========================================================================*/
+function themeIsDark() {
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); }
+  catch (e) { return false; }
+}
+/* 相机基向量 / 视图投影 / 网格包围盒 / 三维光栅化：
+   这些是纯数学，已搬进上方 CORE 纯函数区（CORE_BEGIN 与 CORE_END 标记之间），
+   以便在 node 里配合 mock 2D 上下文做离线回归 —— 见 tests/verify-core.js 的 M 段。 */
+/* 坐标轴指示器（跟随相机旋转，帮助判断方向） */
+function drawAxis3d() {
+  var el = $('#axis3d');
+  if (!el) return;
+  if (S.view !== 'model') { setHidden(el, true); return; }
+  setHidden(el, false);
+  var B = camBasis(CAM.az, CAM.ex), L = 22;
+  var axes = [[[1, 0, 0], 'X', '#d64545'], [[0, 1, 0], 'Y', '#2f9e44'], [[0, 0, 1], 'Z', '#2f6fed']];
+  var out = '';
+  axes.forEach(function (ax) {
+    var v = ax[0];
+    var sx = (v[0] * B.r[0] + v[1] * B.r[1] + v[2] * B.r[2]) * L;
+    var sy = -(v[0] * B.u[0] + v[1] * B.u[1] + v[2] * B.u[2]) * L;
+    out += '<line x1="0" y1="0" x2="' + sx.toFixed(1) + '" y2="' + sy.toFixed(1)
+      + '" stroke="' + ax[2] + '" stroke-width="1.6" stroke-linecap="round"/>';
+    out += '<text x="' + (sx * 1.32).toFixed(1) + '" y="' + (sy * 1.32 + 3).toFixed(1)
+      + '" font-size="10" fill="' + ax[2] + '" text-anchor="middle">' + ax[1] + '</text>';
+  });
+  el.innerHTML = out;
+}
+function draw3d() {
+  var cv = $('#stage3d'), ph = $('#placeholder'), chip = $('#chip');
+  if (!cv) return;
+  var a = active();
+  if (!a || !a.res || !a.res.mesh) {
+    if (ph) ph.style.display = '';
+    if (chip) setHidden(chip, true);
+    var c0 = cv.getContext && cv.getContext('2d');
+    if (c0) { c0.clearRect(0, 0, cv.width, cv.height); }
+    drawAxis3d();
+    return;
+  }
+  if (ph) ph.style.display = 'none';
+  if (chip) setHidden(chip, false);
+  var ctx = cv.getContext && cv.getContext('2d');
+  if (!ctx) return;                     /* 无 canvas 环境（如 jsdom）：安全退出，不崩 */
+  var dim = cvSize(cv);
+  if (ctx.setTransform) ctx.setTransform(dim.dpr, 0, 0, dim.dpr, 0, 0);
+  drawModelTo(ctx, dim.w, dim.h, a.res.mesh, CAM, themeIsDark());
+  if (chip) chip.textContent = 'az ' + Math.round(CAM.az) + '° / ex ' + Math.round(CAM.ex)
+    + '° · ×' + (CAM.zoom || 1).toFixed(2);
+  drawAxis3d();
+}
+function cvSize(cv) {
+  var r = cv.parentNode.getBoundingClientRect ? cv.parentNode.getBoundingClientRect() : { width: 0, height: 0 };
+  var w = Math.max(1, Math.round(r.width || 0)), h = Math.max(1, Math.round(r.height || 0));
+  var dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  }
+  return { w: w, h: h, dpr: dpr };
+}
+/* 视图调度：三维数模（默认）/ 轮廓 */
+function drawStage() {
+  var isModel = S.view === 'model';
+  var s2 = $('#stage'), s3 = $('#stage3d');
+  setHidden(s2, isModel);
+  setHidden(s3, !isModel);
+  /* 切走的那一块必须清空：否则隐藏元素里会留着上一次的路径/像素，
+     DOM 状态与"画面上看到的"就不一致了（回归测试也会因此误判）。 */
+  if (isModel) {
+    if (s2) s2.innerHTML = '';
+  } else {
+    var ctx = s3 && s3.getContext ? s3.getContext('2d') : null;
+    if (ctx) ctx.clearRect(0, 0, s3.width, s3.height);
+  }
+  if (isModel) { draw3d(); return; }
+  setHidden($('#axis3d'), true);
+  drawStage2d();
+}
+/* 按钮/窗口尺寸变化时的统一入口 */
+function viewFit() {
+  if (S.view === 'model') { camReset(); draw3d(); return; }
+  fitView();
+}
+function viewZoom(k) {
+  if (S.view === 'model') {
+    CAM.zoom = Math.max(0.05, Math.min(40, (CAM.zoom || 1) / k));
+    draw3d(); return;
+  }
+  if (window.__zoom2d) window.__zoom2d(k);
+}
+function viewRefresh() {
+  if (S.view === 'model') draw3d(); else applyView();
+}
+/* 三维交互：拖动旋转 / 滚轮缩放 / Shift+拖动 平移 */
+(function bind3d() {
+  var cv = $('#stage3d');
+  if (!cv) return;
+  var drag = null;
+  cv.addEventListener('pointerdown', function (e) {
+    var a = active(); if (!a || !a.res || !a.res.mesh) return;
+    drag = { x: e.clientX, y: e.clientY, az: CAM.az, ex: CAM.ex, px: CAM.panX, py: CAM.panY, pan: !!e.shiftKey };
+    cv.classList.add('drag');
+    if (cv.setPointerCapture) { try { cv.setPointerCapture(e.pointerId); } catch (err) { } }
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (drag.pan) { CAM.panX = drag.px + dx; CAM.panY = drag.py + dy; }
+    else {
+      CAM.az = drag.az + dx * 0.45;
+      CAM.ex = Math.max(-89, Math.min(89, drag.ex + dy * 0.45));
+    }
+    draw3d();
+  });
+  function endDrag() { drag = null; cv.classList.remove('drag'); }
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  cv.addEventListener('wheel', function (e) {
+    var a = active(); if (!a || !a.res || !a.res.mesh) return;
+    e.preventDefault();
+    var k = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    CAM.zoom = Math.max(0.05, Math.min(40, (CAM.zoom || 1) * k));
+    draw3d();
+  }, { passive: false });
+  cv.addEventListener('dblclick', function () { camReset(); draw3d(); });
+  /* 自动旋转：仅在三维视图下跑，切换视图/离开时自动停 */
+  $('#btnSpin').addEventListener('click', function () {
+    CAM.spin = !CAM.spin;
+    this.setAttribute('aria-pressed', String(CAM.spin));
+    tickSpin();
+  });
+  function tickSpin() {
+    if (!CAM.spin || S.view !== 'model') return;
+    CAM.az += 0.6;
+    if (CAM.az > 180) CAM.az -= 360;
+    draw3d();
+    window.__spinTimer = setTimeout(tickSpin, 33);
+  }
+})();
+
+/* ---------------- 统计 / 诊断 ---------------- */
+function renderStats() {
+  var bar = $('#statBar'), a = active();
+  if (!a || !a.res) { bar.innerHTML = '<span class="muted">' + t('stats.empty') + '</span>'; return; }
+  var r = a.res, s = r.unitScale;
+  var W = r.bbox.w * s, H = r.bbox.h * s;                 /* 图纸尺寸（mm） */
+  var pct = r.rawVertexCount ? (r.outVertexCount / r.rawVertexCount * 100) : 0;
+  var devTxt = r.maxDev < 1e-6 ? '0' : fmt(r.maxDev * s, 4);
+  var mb = r.modelBox;
+  /* 模型尺寸取自 float32 顶点表，因此「界面显示的数字」就是「STL 文件里的数字」 */
+  var sizeTxt = mb ? fmt(mb.w, 3) + ' × ' + fmt(mb.h, 3) + ' × ' + fmt(mb.d, 2) + ' mm' : '—';
+  var wt;
+  if (!r.mstat) wt = '<span class="val err">' + (r.meshErr ? r.meshErr : '—') + '</span>';
+  else wt = '<span class="val ' + (r.isWatertight ? 'ok' : 'err') + '">'
+    + t(r.isWatertight ? 'status.watertightOk' : 'status.watertightBad') + '</span>';
+  /* 简易界面只报「交付物本身」的三个数：模型尺寸 / 三角面 / 图纸尺寸。
+     水密、顶点数、最大偏差属于质量诊断，只在专业模式出现（与诊断条同域）。 */
+  var cells = [
+    '<span><span class="k">' + t('stats.model') + '</span><span class="val big">' + sizeTxt + '</span></span>',
+    '<span><span class="k">' + t('stats.faces') + '</span><span class="val">' + (r.mstat ? r.mstat.faceCount : 0) + '</span></span>'
+  ];
+  if (S.mode === 'pro') {
+    cells.push('<span><span class="k">' + t('stats.watertight') + '</span>' + wt + '</span>');
+  }
+  cells.push('<span><span class="k">' + t('stats.size') + '</span><span class="val">' + fmt(W, 3) + ' × ' + fmt(H, 3) + ' mm</span></span>');
+  if (S.mode === 'pro') {
+    cells.push('<span><span class="k">' + t('stats.vertices') + '</span><span class="val">' + r.rawVertexCount + ' → ' + r.outVertexCount +
+      ' (' + pct.toFixed(1) + '%)</span></span>');
+    cells.push('<span><span class="k">' + t('stats.deviation') + '</span><span class="val">' + devTxt + ' mm</span></span>');
+  }
+  bar.innerHTML = cells.join('');
+}
+function renderDiag() {
+  var bar = $('#diagBar'), det = $('#diagDetail'), a = active();
+  /* 诊断条与诊断详情只在专业模式出现：简易界面不展示水密 / 自交 / 嵌套等诊断项。
+     隐藏之外还要清空内容 —— 否则隐藏元素里残留上一次的诊断文本，
+     DOM 状态与"画面上看到的"就不一致了（与切视图清空另一块画布同一个道理）。 */
+  if (S.mode !== 'pro') {
+    setHidden(bar, true);
+    bar.innerHTML = '';
+    det.className = 'diagdetail'; det.innerHTML = '';
+    return;
+  }
+  setHidden(bar, false);
+  if (!a || !a.res) { bar.innerHTML = ''; det.className = 'diagdetail'; det.innerHTML = ''; renderDiagInline(); return; }
+  var r = a.res;
+  var uns = 0; for (var k in r.conv.unsupported) uns += r.conv.unsupported[k];
+  var wtCls = !r.mstat ? 'err' : (r.isWatertight ? 'ok' : 'err');
+  var wtTxt = !r.mstat ? '—' : t(r.isWatertight ? 'status.watertightOk' : 'status.watertightBad');
+  bar.innerHTML =
+    '<span><span class="k">' + t('stats.watertight') + '</span><span class="val ' + wtCls + '">' + wtTxt + '</span></span>' +
+    '<span><span class="k">' + t('diag.selfintersect') + '</span><span class="val ' + (r.selfIntersections ? 'warn' : 'ok') + '">' +
+      r.selfIntersections + '</span></span>' +
+    '<span><span class="k">' + t('diag.nesting') + '</span><span class="val ' + (r.nestedPairs ? 'warn' : 'ok') + '">' +
+      r.nestedPairs + '</span></span>' +
+    '<span><span class="k">' + t('diag.open') + '</span><span class="val ' +
+      ((r.openCount || r.openChains) ? 'warn' : 'ok') + '">' + r.openCount + '</span></span>' +
+    '<span><span class="k">' + t('diag.gaps') + '</span><span class="val ' + (r.gaps.count ? 'warn' : 'ok') + '">' +
+      r.gaps.count + (r.gaps.count ? ' (max ' + fmt(r.gaps.max * r.unitScale, 4) + ' mm)' : '') + '</span></span>' +
+    '<span><span class="k">' + t('diag.branch') + '</span><span class="val ' + (r.branchPoints ? 'warn' : 'ok') + '">' + r.branchPoints + '</span></span>' +
+    '<span><span class="k">' + t('diag.unsupported') + '</span><span class="val ' + (uns ? 'warn' : 'ok') + '">' + uns + '</span></span>' +
+    '<span style="flex:1"></span>' +
+    '<button class="ghost" id="btnDiag" style="padding:2px 8px;font-size:11px">' + t('diag.detail') + '</button>';
+  det.innerHTML = diagHtml(r);
+  var b = $('#btnDiag');
+  if (b) b.addEventListener('click', function () { det.className = det.className.indexOf('open') >= 0 ? 'diagdetail' : 'diagdetail open'; });
+  renderDiagInline();
+}
+function diagHtml(r) {
+  var L = [];
+  L.push('<ul>');
+  /* ---- 三维数模 ---- */
+  if (r.mstat) {
+    var m = r.mstat;
+    L.push('<li><b>' + t('status.stl') + '</b>: ' + t('stats.faces') + ' ' + m.faceCount
+      + ' / ' + t('stats.vertices') + ' ' + m.vertexCount + ' / edges ' + m.edgeCount + '</li>');
+    if (r.modelBox) L.push('<li>' + t('stats.model') + ': '
+      + fmt(r.modelBox.w, 6) + ' × ' + fmt(r.modelBox.h, 6) + ' × ' + fmt(r.modelBox.d, 4) + ' mm</li>');
+    L.push('<li>watertight: boundary edges ' + m.boundaryEdges + ' / non-manifold edges ' + m.nonManifoldEdges
+      + ' → ' + (m.watertight ? 'OK' : 'FAIL') + '</li>');
+    L.push('<li>' + t('diag.euler') + ': V−E+F = ' + m.vertexCount + '−' + m.edgeCount + '+' + m.faceCount + ' = ' + m.euler
+      + ' (' + t('stats.chains') + ': ' + r.chains.length + ')</li>');
+    L.push('<li>signed volume: ' + m.volume.toFixed(4) + ' mm³ (' + (m.normalsOutward ? 'outward OK' : 'INWARD — flip needed') + ')</li>');
+    L.push('<li>' + t('diag.degenerate') + ': ' + m.degenerate + ' / min facet area ' + m.minArea.toExponential(2) + ' mm²</li>');
+    L.push('<li>' + t('params.height') + ': ' + fmt(+S.params.height || 3, 3) + ' mm | '
+      + t('params.fidelity') + ': ' + (r.fidelity ? 'on (+' + r.pinnedAdd + ' pts)' : 'off') + '</li>');
+    var nHole = 0, nSolid = 0, nSkip = 0;
+    (r.ringRoles || []).forEach(function (rr) {
+      if (!rr) return;
+      if (rr.role === 'hole') nHole++;
+      else if (rr.role === 'skip') nSkip++;
+      else nSolid++;
+    });
+    L.push('<li>' + t('diag.rings') + ': ' + nSolid + ' × ' + t('role.solid')
+      + ', ' + nHole + ' × ' + t('role.hole')
+      + (nSkip ? ', ' + nSkip + ' × ' + t('role.skip') : '')
+      + ' | ' + t('params.nestMode') + ' = ' + t('nest.' + (r.nestMode || 'auto')) + '</li>');
+    L.push('<li>' + t('diag.shells') + ': ' + m.shellCount
+      + ' | χ = ' + m.euler + (m.shellEuler.length > 1 ? ' (' + m.shellEuler.join(' + ') + ')' : '')
+      + ' (' + t('params.height') + ' ' + fmt(+S.params.height || 3, 3) + ' mm)</li>');
+    if (r.orientMismatch) L.push('<li><b>' + t('warn.orientMismatch', { n: r.orientMismatch }) + '</b></li>');
+    if (r.openChains) L.push('<li><b>' + t('diag.open') + ': ' + r.openChains + '  → ' + t('role.skip') + '</b></li>');
+    if (r.selfIntersections) L.push('<li><b>' + t('diag.selfintersect') + ': ' + r.selfIntersections + '</b></li>');
+  } else if (r.meshErr) {
+    L.push('<li>[3D] failed: ' + r.meshErr + '</li>');
+  }
+  /* ---- 轮廓与解析 ---- */
+  L.push('<li>' + t('term.eps') + ': ' + fmt(+S.params.eps || 0, 4) + ' mm → ' + t('diag.snapped') + ' ' + r.graph.snapped + '</li>');
+  L.push('<li>' + t('diag.open') + ': ' + r.openCount + ' / ' + t('stats.chains') + ': ' + r.chains.length + '</li>');
+  if (r.gaps.count) L.push('<li>' + t('diag.gaps') + ': ' + r.gaps.count + ', max ' + fmt(r.gaps.max * r.unitScale, 4) + ' mm</li>');
+  L.push('<li>' + t('diag.branch') + ': ' + r.branchPoints + '</li>');
+  L.push('<li>' + t('diag.dupes') + ': ' + r.graph.dupSegments + '</li>');
+  var uns = Object.keys(r.conv.unsupported);
+  if (uns.length) L.push('<li>' + t('diag.unsupported') + ': ' + uns.map(function (k) { return k + '×' + r.conv.unsupported[k]; }).join(', ') + '</li>');
+  if (r.conv.approximate) L.push('<li>' + t('diag.approx') + '</li>');
+  L.push('<li>L1 sequential chaining: ' + (r.l1Hit ? 'hit' : 'no') + '</li>');
+  L.push('<li>unit: ' + r.unit + ' ×' + r.unitScale + ' (insunits=' + r.parsed.insUnits + (r.parsed.acadVer ? ', ' + r.parsed.acadVer : '') + ')</li>');
+  L.push('<li>bbox: ' + [fmt(r.bbox.minX, 4), fmt(r.bbox.minY, 4), fmt(r.bbox.maxX, 4), fmt(r.bbox.maxY, 4)].join(', ') + '</li>');
+  L.push('<li>layers: ' + Object.keys(r.parsed.layers).join(', ') + ' | polylines: ' + r.conv.polylines.length + ' | edges: ' + r.graph.edges.length + '</li>');
+  L.push('</ul>');
+  return L.join('');
+}
+function renderDiagInline() {
+  var el = document.getElementById('diagInline');
+  if (!el) return;
+  var a = active();
+  if (!a || !a.res) { el.textContent = '—'; return; }
+  var r = a.res, uns = Object.keys(r.conv.unsupported);
+  el.innerHTML = diagHtml(r) + (uns.length ? '' : '');
+}
+/* 环境横幅：浏览器是否支持直写目录（该提示与图纸内容无关，任何模式都显示）。
+   注意单位提示已移除：图纸单位默认毫米、且图纸单位控件只在专业模式出现，
+   简易模式下再挂一条「未声明单位」的黄条只会增加噪音。 */
+function renderEnvBanner() {
+  if (!window.showDirectoryPicker) showBanner('bnBrowser'); else hideBanner('bnBrowser');
+  $('#expMode').textContent = window.showDirectoryPicker ? t('exp.dirTip') : t('exp.zipTip');
+}
+function renderUnsupported() {
+  var a = active();
+  if (a && a.res) {
+    var uns = a.res.conv.unsupported, ks = Object.keys(uns);
+    if (ks.length) {
+      var n = 0; ks.forEach(function (k) { n += uns[k]; });
+      $('#bnUnsupportedText').textContent = t('warn.unsupported', { n: n, list: ks.map(function (k) { return k + '×' + uns[k]; }).join(', ') });
+      showBanner('bnUnsupported'); return;
+    }
+  }
+  hideBanner('bnUnsupported');
+}
+/* 三维数模专项告警：水密失败 / 开口链被跳过 / 孔洞无宿主被跳过 / 轮廓自交。
+   这些都是「会直接影响能不能打印」的问题，绝不能只躺在诊断详情里。 */
+function renderModelBanner() {
+  var a = active();
+  if (!a || !a.res || !a.res.mstat) { hideBanner('bnModel'); return; }
+  var r = a.res, msgs = [];
+  if (!r.isWatertight) msgs.push(t('warn.notWatertight'));
+  /* 嵌套轮廓：auto 模式已挖空（告知即可）；fill 模式没挖（需要用户确认） */
+  if (r.nestedCount) {
+    if (r.nestMode === 'fill') msgs.push(t('warn.nestedFilled', { n: r.nestedCount }));
+    else msgs.push(t('warn.nestedHandled', { n: r.holeCount }));
+  }
+  if (r.orientMismatch) msgs.push(t('warn.orientMismatch', { n: r.orientMismatch }));
+  if (r.openChains) msgs.push(t('warn.openChain', { n: r.openChains }));
+  if (r.selfIntersections) msgs.push(t('warn.selfIntersect', { n: r.selfIntersections }));
+  if (r.mstat.shellCount > 1) msgs.push(t('warn.shells', { n: r.mstat.shellCount }));
+  if (!msgs.length) { hideBanner('bnModel'); return; }
+  $('#bnModelText').textContent = msgs.join(' ');
+  showBanner('bnModel');
+}
+function showBanner(id) { setHidden($('#' + id), false); }
+function hideBanner(id) { setHidden($('#' + id), true); }
+function showError(msg) { $('#bnErrorText').textContent = msg; showBanner('bnError'); setTimeout(function () { hideBanner('bnError'); }, 6000); }
+function showBusy(on) { setHidden($('#busy'), !on); }
+
+/* ---------------- 导出 ---------------- */
+/* 输出项：{name, text} 走文本编码，{name, bytes} 直接落字节。
+   STL 必须是字节（binary 是 ArrayBuffer 视图，绝不能当文本编码，否则文件损坏）。 */
+/* 输出文件名：base 由 outputBaseName()（CORE 纯函数）算出，
+   自定义命名规则只在那一处，导出/预览/ZIP 三处共用，不会各写一套。 */
+function expBase(f, idx, total) {
+  return outputBaseName(S.expName, String((f && f.name) || '').replace(/\.dxf$/i, ''), idx, total);
+}
+/* 名字实时预览：把「会导出成什么文件名」直接摆出来，避免导完才发现名字不对。
+   文件都不在时才退回提示占位符用法。 */
+function renderExpName() {
+  var inp = $('#expName'), tip = $('#expNameTip');
+  if (!inp || !tip) return;
+  if (document.activeElement !== inp) inp.value = S.expName || '';
+  var a = active();
+  inp.placeholder = (a && a.name) ? String(a.name).replace(/\.dxf$/i, '') : t('exp.namePh');
+  var ready = S.files.filter(function (f) { return f.status === 'done' && f.res; });
+  if (!ready.length) { tip.textContent = t('exp.tokens'); return; }
+  /* 当前选中的文件排在最前，预览的第一个名字就是他正在看的那张图 */
+  ready.sort(function (x, y) {
+    return (x.id === S.activeId ? -1 : 0) - (y.id === S.activeId ? -1 : 0);
+  });
+  var total = ready.length;
+  var ext = S.exp_stl ? '.stl' : (S.exp_svg ? '.svg' : '.png');
+  var sep = S.lang === 'en' ? ', ' : '、';
+  var names = ready.slice(0, 2).map(function (f, i) { return expBase(f, i, total) + ext; });
+  tip.textContent = total > 2
+    ? t('exp.tipMore', { list: names.join(sep), n: total })
+    : t('exp.tip', { list: names.join(sep) });
+}
+function buildOutputs(f, base) {
+  var r = f.res, out = [];
+  var opt = {
+    unitScale: r.unitScale, strokeWidth: +S.params.strokeWidth || 0.25,
+    strokeColor: S.params.strokeColor || '#000000',
+    keepOffset: !!S.params.keepOffset, singlePath: !!S.params.singlePath
+  };
+  if (!base) base = String(f.name || 'drawing').replace(/\.dxf$/i, '');
+  /* ---- 主功能：三维数模 ---- */
+  if (S.exp_stl && r.mesh && r.mesh.tris.length) {
+    var flip = !!S.params.flipNormals;
+    if (S.params.stlFormat === 'ascii') {
+      out.push({ name: base + '.stl', text: stlAscii(r.mesh, { flipNormals: flip }) });
+    } else {
+      out.push({ name: base + '.stl', bytes: stlBinary(r.mesh, { flipNormals: flip }), isStl: true });
+    }
+  }
+  /* ---- 附带功能：SVG 轮廓（只影响 SVG，绝不影响三维数模）---- */
+  if (S.exp_svg) out.push({ name: base + '.svg', text: svgFor(r.chains, r.bbox, opt) });
+  return out;
+}
+function exportAll() {
+  var ready = S.files.filter(function (f) { return f.status === 'done' && f.res; });
+  if (!ready.length) { toast(t('msg.nothing')); return; }
+  if (!S.exp_stl && !S.exp_svg && !S.exp_png) { toast(t('warn.noExport')); return; }
+  var enc = new TextEncoder();
+  var files = [], pngJobs = [], selfFail = 0, stlCount = 0;
+  var total = ready.length;
+  ready.forEach(function (f, i) {
+    var base = expBase(f, i, total);
+    buildOutputs(f, base).forEach(function (o) {
+      var data = o.bytes ? o.bytes : enc.encode(o.text);
+      files.push({ name: o.name, data: data });
+      if (o.isStl) stlCount++;
+      /* 导出前水密自检：校验的是**真正的输出字节**，不是内存里的网格 */
+      if (o.isStl && S.params.selfCheck !== false) {
+        try {
+          var v = stlReadBack(o.bytes);
+          /* χ > 2 是不可能的 —— 它正是「外板 + 埋在里面的独立小实体」那种
+             错误模型的指纹（两个壳体各 χ=2，合计 4）。只查奇偶会放过它。 */
+          if (!v.watertight || !v.normalsOutward || (v.euler % 2) !== 0 || v.euler > 2) selfFail++;
+        } catch (e) { selfFail++; }
+      }
+    });
+    if (S.exp_png) pngJobs.push({ f: f, base: base });
+  });
+  if (selfFail) showError(t('warn.notWatertight'));
+  if (window.showDirectoryPicker) {
+    showBusy(true);
+    window.showDirectoryPicker({ mode: 'readwrite' }).then(function (dir) {
+      var chain = Promise.resolve();
+      files.forEach(function (o) {
+        chain = chain.then(function () {
+          return dir.getFileHandle(o.name, { create: true })
+            .then(function (h) { return h.createWritable(); })
+            .then(function (w) { return w.write(o.data).then(function () { return w.close(); }); });
+        });
+      });
+      var pc = Promise.resolve();
+      pngJobs.forEach(function (j) {
+        pc = pc.then(function () { return pngBlob(j.f).then(function (b) { return b ? writeFile(dir, j.base + '.png', b) : null; }); });
+      });
+      return chain.then(function () { return pc; }).then(function () {
+        showBusy(false);
+        toast(t('msg.dirDone', { n: files.length + pngJobs.length }));
+      });
+    })['catch'](function (e) {
+      showBusy(false);
+      if (e && e.name === 'AbortError') return;          // 用户取消选择目录
+      toast(String((e && e.message) || e));
+    });
+    return;
+  }
+
+  /* ---- 降级：ZIP 打包下载 ---- */
+  showBusy(true);
+  var seq = Promise.resolve();
+  pngJobs.forEach(function (j) {
+    seq = seq.then(function () {
+      return pngBlob(j.f).then(function (b) {
+        if (!b) return null;
+        return blobToBytes(b).then(function (bytes) {
+          files.push({ name: j.base + '.png', data: bytes });
+        });
+      });
+    });
+  });
+  seq.then(function () {
+    var zip = zipStore(files);
+    var url = URL.createObjectURL(zip);
+    var a = document.createElement('a');
+    a.href = url; a.download = zipName(ready);
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 6000);
+    showBusy(false);
+    toast(t('msg.zipDone', { n: files.length }));
+  })['catch'](function (e) {
+    showBusy(false);
+    toast(String((e && e.message) || e));
+  });
+}
+/* ZIP 包名：自定义名优先（{name} 展开为第一个文件的原名），否则退回通用名前缀 */
+function zipName(ready) {
+  var zb = sanitizeFileName(S.expName).split('{name}').join(expBase(ready[0], 0, ready.length)).split('{n}').join('');
+  zb = sanitizeFileName(zb) || 'dxf-toolkit-export';
+  return zb + '-' + stamp() + '.zip';
+}
+function writeFile(dir, name, blob) {
+  return dir.getFileHandle(name, { create: true })
+    .then(function (h) { return h.createWritable(); })
+    .then(function (w) { return w.write(blob).then(function () { return w.close(); }); });
+}
+function blobToBytes(b) { return b.arrayBuffer().then(function (ab) { return new Uint8Array(ab); }); }
+function stamp() {
+  var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
+}
+/* PNG 预览：三维视图的高分辨率截图（长边约 1600px）
+   为什么改成画布截图：预览本身已经是三维模型，截图才能做到「所见即所得」。
+   幅面按当前相机下的投影范围紧贴模型，不留大片空白。
+   无 canvas 环境（如 jsdom）返回 null —— 明确跳过，不假装成功。 */
+function pngBlob(f) {
+  return new Promise(function (resolve) {
+    if (!f || !f.res || !f.res.mesh) return resolve(null);
+    var mesh = f.res.mesh, bb = meshBounds(mesh);
+    var cv;
+    try { cv = document.createElement('canvas'); } catch (e) { return resolve(null); }
+    if (!cv.getContext) return resolve(null);
+    var ctx;
+    try { ctx = cv.getContext('2d'); } catch (e) { return resolve(null); }
+    if (!ctx) return resolve(null);
+    try {
+      var B = camBasis(CAM.az, CAM.ex), fv = mesh.verts, i;
+      var mnx = Infinity, mny = Infinity, mxx = -Infinity, mxy = -Infinity;
+      for (i = 0; i < fv.length; i += 3) {
+        var vx = fv[i] - bb.c[0], vy = fv[i + 1] - bb.c[1], vz = fv[i + 2] - bb.c[2];
+        var px = vx * B.r[0] + vy * B.r[1] + vz * B.r[2];
+        var py = vx * B.u[0] + vy * B.u[1] + vz * B.u[2];
+        if (px < mnx) mnx = px;
+        if (px > mxx) mxx = px;
+        if (py < mny) mny = py;
+        if (py > mxy) mxy = py;
+      }
+      var pw = Math.max(1e-6, mxx - mnx), ph = Math.max(1e-6, mxy - mny);
+      var LONG = 1600, PAD = 1.08;
+      var scale = LONG / Math.max(pw, ph) / PAD;
+      var W = Math.max(64, Math.round(pw * scale)), H = Math.max(64, Math.round(ph * scale));
+      cv.width = W; cv.height = H;
+      drawModelTo(ctx, W, H, mesh, { az: CAM.az, ex: CAM.ex, zoom: 1, panX: 0, panY: 0 },
+        themeIsDark(), scale);
+      if (!cv.toBlob) return resolve(null);
+      cv.toBlob(function (b) { resolve(b || null); }, 'image/png');
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+/* ---------------- 帮助弹窗 ---------------- */
+var GLOSSARY = [
+  ['链化', 'chaining'],
+  ['无损', 'lossless'],
+  ['顶点数压缩比', 'vertex reduction ratio'],
+  ['最大偏差', 'maximum deviation'],
+  ['断口', 'gap'],
+  ['吸附容差', 'snap tolerance'],
+  ['分支点', 'branch point'],
+  ['开口链', 'open chain'],
+  ['物理尺寸', 'physical size'],
+  ['挤出', 'extrusion'],
+  ['网格', 'mesh'],
+  ['三角面', 'facet / triangle'],
+  ['耳切三角化', 'ear clipping'],
+  ['盖面 / 侧壁', 'cap / side wall'],
+  ['水密', 'watertight'],
+  ['流形 / 非流形边', 'manifold / non-manifold edge'],
+  ['法向', 'normal'],
+  ['实体数模', 'solid model (STL)'],
+  ['包围盒', 'bounding box'],
+  ['欧拉特征数', 'Euler characteristic']
+];
+function renderHelp() {
+  $('#mTitle').textContent = t('help.title');
+  $('#mVer').textContent = 'dxf-toolkit · v2.2.0 · single file · no network · no dependency' +
+    ' · audit: no network API is called by this file (CSP blocks connect-src entirely)' +
+    ' · integrity: full SHA-256 published in SHA256SUMS.txt next to this file';
+  var rows = GLOSSARY.map(function (r) {
+    return '<tr><td style="width:38%">' + r[0] + '</td><td>' + r[1] + '</td></tr>';
+  }).join('');
+  $('#mBody').innerHTML =
+    '<p>' + t('help.intro') + '</p>' +
+    '<h3>' + t('help.s1t') + '</h3><p>' + t('help.s1') + '</p>' +
+    '<h3>' + t('help.s2t') + '</h3><p>' + t('help.s2') + '</p>' +
+    '<h3>' + t('help.s3t') + '</h3><p>' + t('help.s3') + '</p>' +
+    '<h3>' + t('help.s4t') + '</h3><p>' + t('help.s4') + '</p>' +
+    '<h3>' + t('help.privacyT') + '</h3><div class="note">' + t('help.privacy') + '</div>' +
+    '<h3>FAQ</h3>' +
+    '<p><b>' + t('help.faq1q') + '</b><br>' + t('help.faq1a') + '</p>' +
+    '<p><b>' + t('help.faq2q') + '</b><br>' + t('help.faq2a') + '</p>' +
+    '<p><b>' + t('help.faq3q') + '</b><br>' + t('help.faq3a') + '</p>' +
+    '<p><b>' + t('help.faq4q') + '</b><br>' + t('help.faq4a') + '</p>' +
+    '<p><b>' + t('help.faq5q') + '</b><br>' + t('help.faq5a') + '</p>' +
+    '<h3>' + t('term.title') + '</h3><table><tbody>' + rows + '</tbody></table>';
+  $('#modal').classList.add('open');
+  $('#btnModalClose').focus();
+}
+
+/* ---------------- i18n 应用 ---------------- */
+function applyI18n() {
+  document.documentElement.lang = S.lang === 'en' ? 'en' : 'zh';
+  document.title = t('app.title');
+  $$('[data-i18n]').forEach(function (el) {
+    var k = el.getAttribute('data-i18n');
+    if (k) el.textContent = t(k);
+  });
+  /* title / placeholder 不是 textContent，得单独过一遍（否则切语言时留在旧语言） */
+  $$('[data-i18n-title]').forEach(function (el) {
+    var k = el.getAttribute('data-i18n-title');
+    if (k) el.title = t(k);
+  });
+  $$('[data-i18n-ph]').forEach(function (el) {
+    var k = el.getAttribute('data-i18n-ph');
+    if (k) el.placeholder = t(k);
+  });
+}
+function syncSegs() {
+  $$('[data-ui]').forEach(function (b) {
+    var kind = b.getAttribute('data-ui'), v = b.getAttribute('data-val'), cur;
+    if (kind === 'mode') cur = S.mode;
+    else if (kind === 'lang') cur = S.lang;
+    else cur = S.view;
+    b.setAttribute('aria-pressed', String(cur === v));
+  });
+}
+
+/* ---------------- 事件绑定 ---------------- */
+function filesFromDataTransfer(dt) {
+  var out = [];
+  var items = dt.items ? Array.prototype.slice.call(dt.items) : [];
+  var entries = [];
+  items.forEach(function (it) {
+    if (it.kind === 'file' && it.webkitGetAsEntry) {
+      var e = it.webkitGetAsEntry();
+      if (e) entries.push(e);
+    }
+  });
+  if (!entries.length) return Promise.resolve(Array.prototype.slice.call(dt.files || []));
+  function walk(entry) {
+    return new Promise(function (res) {
+      if (!entry) return res();
+      if (entry.isFile) {
+        entry.file(function (f) { out.push(f); res(); }, function () { res(); });
+      } else if (entry.isDirectory) {
+        var rd = entry.createReader();
+        (function batch() {
+          rd.readEntries(function (list) {
+            if (!list || !list.length) return res();
+            Promise.all(list.map(walk)).then(batch, batch);
+          }, function () { res(); });
+        })();
+      } else { res(); }
+    });
+  }
+  return Promise.all(entries.map(walk)).then(function () { return out; });
+}
+function bind() {
+  $$('[data-ui]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var kind = b.getAttribute('data-ui'), v = b.getAttribute('data-val');
+      if (kind === 'mode') {
+        if (S.mode === v) return;
+        S.mode = v; saveParams(); syncSegs(); renderParams();
+        /* 统计条与诊断条的**内容本身与模式有关**（简易模式不出水密/自检项），
+           所以切模式必须重渲染这两条，不能只重画预览。 */
+        renderStats(); renderDiag(); renderExpName();
+        drawStage();
+      } else if (kind === 'lang') {
+        if (S.lang === v) return;
+        S.lang = v; saveParams(); applyI18n(); syncSegs(); renderParams();
+        renderQueue(); renderStats(); renderDiag(); renderEnvBanner();
+        if ($('#modal').classList.contains('open')) renderHelp();
+      } else {
+        if (S.view === v) return;
+        S.view = v; saveParams(); syncSegs();
+        if (v !== 'model' && CAM.spin) {                 /* 离开三维视图 → 停自动旋转 */
+          CAM.spin = false;
+          var sb = $('#btnSpin'); if (sb) sb.setAttribute('aria-pressed', 'false');
+        }
+        drawStage();
+      }
+    });
+  });
+
+  var drop = $('#drop');
+  drop.addEventListener('click', function () { $('#fileInput').click(); });
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.add('hot'); });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    drop.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.remove('hot'); });
+  });
+  drop.addEventListener('drop', function (e) {
+    filesFromDataTransfer(e.dataTransfer).then(addFiles);
+  });
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('drop', function (e) {
+    e.preventDefault();
+    if (drop.contains(e.target)) return;
+    filesFromDataTransfer(e.dataTransfer).then(addFiles);
+  });
+  $('#fileInput').addEventListener('change', function (e) {
+    addFiles(e.target.files);
+    e.target.value = '';
+  });
+  $('#btnClear').addEventListener('click', clearAll);
+  $('#btnConvert').addEventListener('click', convertAll);
+  $('#btnExport').addEventListener('click', exportAll);
+  $('#btnHelp').addEventListener('click', renderHelp);
+  $('#btnModalClose').addEventListener('click', function () { $('#modal').classList.remove('open'); });
+  $('#modal').addEventListener('click', function (e) {
+    if (e.target === $('#modal')) $('#modal').classList.remove('open');
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && $('#modal').classList.contains('open')) $('#modal').classList.remove('open');
+  });
+  [['optStl', 'exp_stl', 'stl'], ['optSvg', 'exp_svg', 'svg'], ['optPng', 'exp_png', 'png']].forEach(function (row) {
+    var el = $('#' + row[0]);
+    if (!el) return;
+    el.addEventListener('change', function () { S[row[1]] = el.checked; saveParams(); renderExpName(); });
+  });
+  /* 导出文件名：输入时就按最终规则预览（脏字符当次即清理，失焦把输入框归一化到实际值） */
+  var nameIn = $('#expName');
+  if (nameIn) {
+    nameIn.addEventListener('input', function () {
+      var clean = sanitizeFileName(nameIn.value);
+      S.expName = clean;
+      nameIn.classList.toggle('bad', clean !== nameIn.value.trim());
+      saveParams(); renderExpName();
+    });
+    nameIn.addEventListener('change', function () {
+      var clean = sanitizeFileName(nameIn.value);
+      if (clean !== nameIn.value) { nameIn.value = clean; toast(t('exp.cleaned')); }
+      nameIn.classList.remove('bad');
+      S.expName = clean; saveParams(); renderExpName();
+    });
+  }
+  /* 事件委托：参数面板会被 renderParams() 整块重建，直接 bind 到元素上的监听会失效 */
+  document.addEventListener('change', function (e) {
+    var el = e.target;
+    if (!el || !el.getAttribute) return;
+    if (el.getAttribute('data-p') === 'unit') S.unitTouched = true;
+    var rr = el.getAttribute('data-ringrole');       /* 轮廓角色下拉（面板会重建 → 必须委托） */
+    if (rr !== null) setRingRole(parseInt(rr, 10), el.value);
+  });
+  document.addEventListener('click', function (e) {
+    var el = e.target;
+    if (!el || !el.getAttribute) return;
+    var rl = el.getAttribute('data-ringlocate');
+    if (rl !== null) {                                /* 「定位」→ 切到轮廓视图并高亮该环 */
+      S.ringSel = parseInt(rl, 10);
+      if (S.view !== 'contour') { S.view = 'contour'; saveParams(); syncSegs(); }
+      renderParams(); drawStage();
+      return;
+    }
+    if (el.id === 'btnRoleReset') {                   /* 全部恢复自动 */
+      var a0 = active();
+      if (a0) { a0.roleOv = null; a0.roleOvSig = null; computeFile(a0, null); }
+      renderParams();
+      return;
+    }
+    var row = el.closest ? el.closest('.ringrow') : null;
+    if (row) {                                        /* 点行 → 选中该环 */
+      S.ringSel = parseInt(row.getAttribute('data-ring'), 10);
+      renderParams(); drawStage();
+    }
+  });
+  /* 轮廓视图里直接点环也能选中 */
+  if ($('#stage')) {
+    $('#stage').addEventListener('click', function (e) {
+      var el = e.target;
+      var ri = el && el.getAttribute ? el.getAttribute('data-ring') : null;
+      if (ri === null || ri === undefined) return;
+      S.ringSel = parseInt(ri, 10);
+      renderParams(); drawStage();
+    });
+  }
+  window.addEventListener('resize', viewRefresh);
+}
+
+/* ---------------- 启动 ---------------- */
+function init() {
+  loadParams();
+  applyI18n();
+  syncSegs();
+  renderParams();
+  var nameIn = $('#expName');
+  if (nameIn) {
+    nameIn.value = S.expName || '';
+    nameIn.classList.remove('bad');
+  }
+  $('#optStl').checked = !!S.exp_stl;
+  $('#optSvg').checked = !!S.exp_svg;
+  $('#optPng').checked = !!S.exp_png;
+  renderQueue();
+  renderStats();
+  renderDiag();
+  renderEnvBanner();
+  renderUnsupported();
+  renderModelBanner();
+  bind();
+  drawStage();
+}
+init();
+
+})();
+</script>
+</body>
+</html>
